@@ -77,7 +77,7 @@ function vHome(){
   const lead=hi?`${hi} high-risk finding${hi>1?'s are':' is'} still open`:od.length?`${od.length} action${od.length>1?'s are':' is'} overdue`:open.length?`${open.length} open finding${open.length>1?'s':''}, none high-risk`:'No open findings';
   return `<div class="head"><div class="titles"><h1>${esc(lead)}</h1><p class="sub">${S.clients.length} client${S.clients.length===1?'':'s'} · ${S.audits.length} audit${S.audits.length===1?'':'s'} · ${S.evidence.length} evidence file${S.evidence.length===1?'':'s'}</p></div></div>
   <div class="kpis"><div class="kpi"><b>${open.length}</b><span>Open findings</span></div><div class="kpi ${hi?'alert':''}"><b>${hi}</b><span>High-risk open</span></div><div class="kpi ${od.length?'alert':''}"><b>${od.length}</b><span>Actions overdue</span></div><div class="kpi"><b>${act.length}</b><span>Audits in progress</span></div><div class="kpi ${n&&d===n?'good':''}"><b>${n?pct(d,n)+'%':'—'}</b><span>Roadmap covered${n?` (${d}/${n})`:''}</span></div></div>
-  <div class="grid2"><div class="panel"><div class="row"><h2 class="sp" style="margin:0">Due this month and earlier</h2><a class="small" href="#roadmap">All roadmaps</a></div>
+  ${dashPanel()}<div class="grid2"><div class="panel"><div class="row"><h2 class="sp" style="margin:0">Due this month and earlier</h2><a class="small" href="#roadmap">All roadmaps</a></div>
    ${due.length?due.sort((x,y)=>x.it.q-y.it.q).slice(0,8).map(({c,it,s})=>`<a class="card" style="margin-top:8px" href="#client-${c.id}" data-act="toRoadmap"><div class="row"><span class="tag ${RMS[s][0]}">${RMS[s][1]}</span><span class="small muted">${QTR[it.q][0]} · ${esc(c.name)}</span></div><div style="margin-top:4px;font-weight:600">${esc(it.title)}</div></a>`).join(''):`<p class="muted">${n?'Nothing pending up to this quarter.':'No roadmaps yet. Open a client and generate one.'}</p>`}</div>
    <div class="panel"><h2>Overdue actions</h2>${od.length?od.sort((a,b)=>a.due.localeCompare(b.due)).slice(0,6).map(o=>`<a class="card" style="margin-top:8px" href="#obs-${o.id}"><div class="row"><span class="tag ${o.rating}">${RLABEL[o.rating]}</span><span class="over small">Due ${fmtD(o.due)}</span></div><div style="margin-top:4px;font-weight:600">${esc(o.title)}</div><div class="small muted">${esc(cname(o.clientId))} · ${esc(o.owner||'No owner')}</div></a>`).join(''):'<p class="muted">Nothing overdue.</p>'}</div></div>
   ${per.length?`<div class="section panel"><h2>Open findings by client</h2><div class="bars">${per.map(p=>`<div class="bar"><a href="#client-${p.c.id}">${esc(p.c.name)}</a><div class="track" role="img" aria-label="${p.H} high, ${p.M} medium, ${p.L} low">${['H','M','L'].map(k=>p[k]?`<span class="${k}-bg" style="width:${p[k]/max*100}%"></span>`:'').join('')}</div><span class="num">${p.n}</span></div>`).join('')}</div><div class="legend"><span><i class="dot H-bg"></i>High</span><span><i class="dot M-bg"></i>Medium</span><span><i class="dot L-bg"></i>Low</span></div></div>`:''}
@@ -131,7 +131,7 @@ function vClient(){
   const au=S.audits.filter(a=>a.clientId===c.id),ob=S.observations.filter(o=>o.clientId===c.id),op=ob.filter(o=>o.status!=='Closed'),ev=S.evidence.filter(e=>e.clientId===c.id);
   setTop([['Clients','clients'],[c.name]],`<a class="btn ghost" href="#edit-${c.id}">${ic('edit')}Edit master</a><button class="btn" data-act="tab" data-tab="audits" data-new="1">${ic('plus')}New audit</button>`);
   const vd=S.vouching.find(v=>v.clientId===c.id&&v.fy===fyNow());const tabs=[['overview','Overview'],['plan','Audit plan'],['roadmap','Roadmap',its.length],['audits','Audits',au.length],['observations','Findings',op.length],['atr','Action taken',op.length],['month','Monthly report',''],['evidence','Evidence',ev.length]];
-  const body={overview:()=>clientOverview(c,L),plan:()=>planTab(c),atr:()=>atrTab(c),month:()=>monthTab(c),roadmap:()=>roadmapBoard(c),audits:()=>clientAudits(c,au),observations:()=>obsTable(ob,{client:c}),evidence:()=>evidenceList(ev,{showAudit:true})}[ui.ctab]||(()=>clientOverview(c,L));
+  const body={overview:()=>clientOverview(c,L),plan:()=>planTab(c),atr:()=>remindersPanel(c)+atrTab(c),month:()=>monthTab(c),roadmap:()=>roadmapBoard(c),audits:()=>clientAudits(c,au),observations:()=>obsTable(ob,{client:c}),evidence:()=>evidenceList(ev,{showAudit:true})}[ui.ctab]||(()=>clientOverview(c,L));
   return `<div class="head"><div class="titles"><h1>${esc(c.name)}</h1><div class="chips"><span class="chip">${esc(ENT[c.type]||'')}</span>${isSmall(c)?'<span class="chip">Small company</span>':''}<span class="chip">${esc(BIZ[c.biz]||'')}</span>${c.reg&&c.reg!=='none'?`<span class="chip">${esc(REG[c.reg])}</span>`:''}${c.system?`<span class="chip">Books in ${esc(c.system)}</span>`:''}<span class="chip">Turnover ₹${esc(c.turnover||0)} cr</span></div></div></div>
   <div class="kpis"><div class="kpi"><b>${y}</b><span>Requirements apply${ch?` (+${ch} to check)`:''}</span></div><div class="kpi ${its.length&&dn===its.length?'good':''}"><b>${its.length?pct(dn,its.length)+'%':'—'}</b><span>Roadmap covered</span></div><div class="kpi"><b>${au.filter(a=>!['Reported','Closed'].includes(a.stage)).length}</b><span>Audits in progress</span></div><div class="kpi ${op.some(o=>o.rating==='H')?'alert':''}"><b>${op.length}</b><span>Open findings</span></div><div class="kpi"><b>${ev.length}</b><span>Evidence files</span></div></div>
   <div class="tabs" role="tablist">${tabs.map(([k,l,n])=>`<button role="tab" aria-selected="${ui.ctab===k}" class="${ui.ctab===k?'on':''}" data-act="tab" data-tab="${k}">${l}${n?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>${body()}`;
@@ -210,7 +210,7 @@ function vAudit(){
   resolveNames([a.prepBy,a.revBy,...ev.map(x=>x.uploadedBy)]);
   setTop([['Audits','audits'],[c.name||'Client','client-'+c.id],[a.title]],`<button class="btn" data-act="tab" data-tab="report">${ic('report')}Report</button>`);
   const tabs=[['programme','Programme',(()=>{const P=progStatus(a,c);return P.dn.length+'/'+P.need.length})()],['checklist','Checklist',`${t}/${a.items.length}`],['proc','Procedures',''],['evidence','Evidence',ev.length],['observations','Findings',obs.length],['signoff','Sign-off'],['report','Report']];
-  const body={programme:()=>programmeTab(a,c),proc:()=>procTab(a,c),checklist:()=>checklistTab(a,ev,obs),tests:()=>testsTab(a),vouching:()=>procNote(c)+vouchingTab(c),recon:()=>procNote(c)+reconTab(c),evidence:()=>`<label class="drop" data-drop="audit">${ic('up')}<b>Drop evidence files here or click to upload</b><span class="small">Excel workings, ledgers, PDFs, screenshots, confirmations · linked to this audit</span><input type="file" data-file="audit" multiple hidden></label><div style="margin-top:10px">${evidenceList(ev,{audit:a})}</div>`,observations:()=>`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="newObs">${ic('plus')}New finding</button></div>${obsTable(obs,{})}`,signoff:()=>signoffTab(a),report:()=>reportTab(a)}[ui.atab]||(()=>checklistTab(a,ev,obs));
+  const body={programme:()=>programmeTab(a,c),proc:()=>procTab(a,c),checklist:()=>checklistTab(a,ev,obs),tests:()=>testsTab(a),vouching:()=>procNote(c)+vouchingTab(c),recon:()=>procNote(c)+reconTab(c),evidence:()=>`<label class="drop" data-drop="audit">${ic('up')}<b>Drop evidence files here or click to upload</b><span class="small">Excel workings, ledgers, PDFs, screenshots, confirmations · linked to this audit</span><input type="file" data-file="audit" multiple hidden></label><div style="margin-top:10px">${evidenceList(ev,{audit:a})}</div>`,observations:()=>mgmtPanel(a)+`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="newObs">${ic('plus')}New finding</button></div>${obsTable(obs,{})}`,signoff:()=>signoffTab(a),report:()=>reportTab(a)}[ui.atab]||(()=>checklistTab(a,ev,obs));
   return `<div class="head"><div class="titles"><h1>${esc(a.title)}</h1><p class="sub"><a href="#client-${c.id}">${esc(c.name||'')}</a> · ${esc(a.period||'Period not set')}${a.due?' · fieldwork due '+fmtD(a.due):''}</p></div></div>
   <div class="stepper" role="group" aria-label="Audit stage">${STAGES.map((s,i)=>`<button data-act="stage" data-v="${s}" class="${i<si?'done':i===si?'cur':''}" aria-pressed="${i===si}">${s}</button>`).join('')}</div>
   <div class="row small muted" style="margin:8px 0 4px;gap:16px"><span><b style="color:var(--ink)">${t}/${a.items.length}</b> checks tested</span><span><b class="${e?'over':''}" style="${e?'':'color:var(--ink)'}">${e}</b> exception${e===1?'':'s'}</span><span><b style="color:var(--ink)">${ev.length}</b> evidence file${ev.length===1?'':'s'}</span><span><b style="color:var(--ink)">${obs.length}</b> finding${obs.length===1?'':'s'}</span><span>${a.revBy?'<span class="tag g">Reviewed</span>':a.prepBy?'<span class="tag y">Awaiting review</span>':'<span class="tag n">Not signed</span>'}</span></div>
@@ -218,13 +218,15 @@ function vAudit(){
   <div class="tabs" role="tablist">${tabs.map(([k,l,n])=>`<button role="tab" aria-selected="${ui.atab===k}" class="${ui.atab===k?'on':''}" data-act="tab" data-tab="${k}">${l}${n!==''&&n!=null?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>${body()}`;
 }
 function checklistTab(a,ev,obs){
-  return `<div class="progress" style="height:10px;margin-bottom:6px"><span style="width:${pct(a.items.filter(i=>i.r&&i.r!=='ex').length,a.items.length)}%"></span><span class="x" style="width:${pct(a.items.filter(i=>i.r==='ex').length,a.items.length)}%"></span></div>
-  ${a.items.map((it,i)=>{const ie=ev.filter(x=>x.item===i),ob=obs.find(o=>o.item===i);return `<div class="chk"><span class="no">${i+1}</span><div><div class="q">${esc(it.q)}</div><div class="ref">${esc(it.ref||'')}</div></div>
+  if(ui.rcm)return rcmView(a);
+  return `<div class="row" style="margin-bottom:8px"><span class="small muted sp">Each step is a control: test its design and its operation. Reviewers can leave notes on any step.</span><button class="btn ghost sm" data-act="rcmToggle">Risk and control matrix</button></div><div class="progress" style="height:10px;margin-bottom:6px"><span style="width:${pct(a.items.filter(i=>i.r&&i.r!=='ex').length,a.items.length)}%"></span><span class="x" style="width:${pct(a.items.filter(i=>i.r==='ex').length,a.items.length)}%"></span></div>
+  ${a.items.map((it,i)=>{const ie=ev.filter(x=>x.item===i),ob=obs.find(o=>o.item===i);return `<div class="chk"><span class="no">${i+1}</span><div><div class="q">${esc(it.q)}</div><div class="ref">${esc(it.ref||'')}</div><div class="small muted">Risk: ${esc(rcmOf(a,i).risk)} · ${rcmOf(a,i).type}</div></div>
    <div class="seg" role="group" aria-label="Result">${[['ok','Satisfactory'],['ex','Exception'],['na','N/A']].map(([v,l])=>`<button data-act="res" data-i="${i}" data-v="${v}" class="${v} ${it.r===v?'on':''}" aria-pressed="${it.r===v}">${l}</button>`).join('')}</div>
+   <div class="seg" role="group" aria-label="Design" style="grid-column:2/-1;justify-self:start;margin-top:4px">${[['eff','Design effective'],['weak','Design weak']].map(([v,l])=>`<button data-act="dres" data-i="${i}" data-v="${v}" class="${v==='eff'?'ok':'ex'} ${it.d===v?'on':''}" aria-pressed="${it.d===v}">${l}</button>`).join('')}</div>
    <div class="body"><textarea data-note="${i}" placeholder="Work done, sample, conclusion" aria-label="Working note for check ${i+1}">${esc(it.n||'')}</textarea>
     <div class="chips" style="margin-top:6px">${ie.map(x=>`<button class="chip" data-act="evDl" data-id="${x.id}" title="Download ${esc(x.name)}">${ic('clip')}<b>${eref(a,x.id)}</b><span>${esc(x.name)}</span></button>`).join('')}
     <label class="chip" style="cursor:pointer;color:var(--acc-ink)">${ic('plus')}Attach evidence<input type="file" data-file="item" data-i="${i}" multiple hidden></label>
-    ${it.r==='ex'?(ob?`<a class="chip" href="#obs-${ob.id}"><span class="tag ${ob.rating}">${RLABEL[ob.rating]}</span><span>Finding raised</span></a>`:`<button class="chip" style="color:var(--hi);border-color:color-mix(in srgb,var(--hi) 40%,transparent)" data-act="raise" data-i="${i}">${ic('flag')}Raise finding</button>`):''}</div></div></div>`}).join('')}
+    ${it.r==='ex'?(ob?`<a class="chip" href="#obs-${ob.id}"><span class="tag ${ob.rating}">${RLABEL[ob.rating]}</span><span>Finding raised</span></a>`:`<button class="chip" style="color:var(--hi);border-color:color-mix(in srgb,var(--hi) 40%,transparent)" data-act="raise" data-i="${i}">${ic('flag')}Raise finding</button>`):''}</div>${reviewBox(a,'item:'+i,'step '+(i+1))}</div></div>`}).join('')}
   <form class="row" id="addItemForm" style="margin-top:14px"><input id="newItem" placeholder="Add your own check" style="flex:1 1 20em" required><button class="btn ghost" type="submit">${ic('plus')}Add check</button></form>`;
 }
 function testsTab(a){
@@ -236,6 +238,7 @@ function testsTab(a){
 function signoffTab(a){
   return `<div class="grid2"><div class="card"><h3>Prepared</h3><p style="margin:4px 0 12px">${a.prepBy?`<b>${esc(who(a.prepBy))}</b> on ${fmtD(a.prepAt)}`:'Not signed yet'}</p><button class="btn ${a.prepBy?'ghost':''}" data-act="signPrep">${a.prepBy?'Re-sign as preparer':'Sign as preparer'}</button></div>
   <div class="card"><h3>Reviewed (SIA 350)</h3><p style="margin:4px 0 12px">${a.revBy?`<b>${esc(who(a.revBy))}</b> on ${fmtD(a.revAt)}`:'Not reviewed yet'}</p><button class="btn ${a.revBy?'ghost':''}" data-act="signRev" ${a.prepBy?'':'disabled'}>Sign as reviewer</button>${a.prepBy&&a.prepBy===a.revBy?'<p class="small over">Preparer and reviewer are the same person.</p>':''}</div></div>
+  <h2 class="section">Review notes (SIA 350)</h2>${reviewList(a)}
   <p class="section"><button class="btn warn sm" data-act="delAudit">${arm('audit','Delete audit','Click again to delete this audit and its evidence')}</button></p>`;
 }
 
@@ -316,6 +319,7 @@ function reportBody(a){
   ${vouchReport(a)}
   ${reconReport(a)}
   ${programmeReport(a)}
+  ${rcmReport(a)}
   <p style="margin-top:26px">Prepared by: <b>${esc(who(a.prepBy))}</b>${a.prepAt?' ('+fmtD(a.prepAt)+')':''} &nbsp;·&nbsp; Reviewed by: <b>${esc(who(a.revBy))}</b>${a.revAt?' ('+fmtD(a.revAt)+')':''}</p>`;
 }
 function reportDoc(a){return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(a.title)+' - internal audit report</title><style>body{font:14px/1.5 Calibri,Arial,sans-serif;max-width:920px;margin:30px auto;padding:0 20px;color:#141a33}table{border-collapse:collapse;width:100%;margin:8px 0}th,td{border:1px solid #ccd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f3f4f9}h1{font-size:26px}h2{font-size:17px;margin-top:26px;border-bottom:2px solid #141a33;padding-bottom:4px}h3{font-size:15px}</style></head><body>'+reportBody(a)+'</body></html>'}
@@ -376,14 +380,14 @@ const ACT={
   rmDone:t=>{const c=C();saveRoadmap(c,{...c.roadmap,items:c.roadmap.items.map(i=>i.id===t.dataset.id?{...i,done:!i.done}:i)})},
   rmDel:t=>{const c=C();saveRoadmap(c,{...c.roadmap,items:c.roadmap.items.filter(i=>i.id!==t.dataset.id)})},
   addreq:t=>{const c=C(),a=applicability(c).find(x=>x.name===t.dataset.name),m=COMPLIANCE[a.name],cq=Math.min(curQ(c.roadmap.fy),11),add=m?m[2].map(q=>({area:m[0],title:m[1],q:Math.max(q*3+2,cq)})):[{area:a.areas[0],title:AREA_NAME(a.areas[0])+' review',q:cq}];saveRoadmap(c,{...c.roadmap,items:[...c.roadmap.items,...add.map(x=>({id:nid(),source:'manual',done:false,auditId:'',why:'Required: '+a.name,req:a.name,...x}))]})},
-  stage:t=>{const a=A(),v=t.dataset.v;if(['Reported','Closed'].includes(v)){const c=S.clients.find(x=>x.id===a.clientId),m=c&&mandatory(c);if(c){const P=progStatus(a,c);if(!P.done)return toast('Finish the audit programme first: '+P.need.filter(x=>x.st!=='done'&&x.st!=='na').map(x=>PR[x.k].n).join(', ')+'.')}}put('audits',a.id,{...a,stage:v})},
+  stage:t=>{const a=A(),v=t.dataset.v;if(['Reported','Closed'].includes(v)){const c=S.clients.find(x=>x.id===a.clientId),m=c&&mandatory(c);if(c){const P=progStatus(a,c);if(!P.done)return toast('Finish the audit programme first: '+P.need.filter(x=>x.st!=='done'&&x.st!=='na').map(x=>PR[x.k].n).join(', ')+'.')}if(openNotes(a).length)return toast('Clear the '+openNotes(a).length+' open review note'+(openNotes(a).length===1?'':'s')+' first (Sign-off tab).')}put('audits',a.id,{...a,stage:v})},
   res:t=>{const a=A(),i=+t.dataset.i,v=a.items[i].r===t.dataset.v?'':t.dataset.v;put('audits',a.id,{...a,items:a.items.map((x,k)=>k===i?{...x,r:v}:x),stage:a.stage==='Planned'?'Fieldwork':a.stage})},
   raise:t=>{const a=A(),i=+t.dataset.i,it=a.items[i];newObs({clientId:a.clientId,auditId:a.id,item:i,title:it.q.replace(/^(.)/,s=>s.toUpperCase())+': exception',condition:it.n||'',criteria:it.q,evidence:S.evidence.filter(e=>e.auditId===a.id&&e.item===i).map(e=>e.id)})},
   testObs:t=>{const a=A(),r=a.tests.res.find(x=>x.key===t.dataset.k);newObs({clientId:a.clientId,auditId:a.id,title:r.name+' in '+a.title.toLowerCase(),condition:`${r.total} entries found in ${a.tests.file} (${a.tests.rows} rows). Examples: `+r.hits.slice(0,3).map(h=>`${h.date} ${h.party} ${inr(h.amount)}`).join('; ')+'.',criteria:r.why,evidence:a.tests.evidenceId?[a.tests.evidenceId]:[]})},
   evDl:t=>{const e=S.evidence.find(x=>x.id===t.dataset.id);if(!e)return;evidenceBlob(e).then(b=>dlFile(e.name,b),er=>toast(er.message))},
   evDel:t=>{const k='ev:'+t.dataset.id;if(ui.armed!==k){ui.armed=k;return render()}ui.armed=null;const e=S.evidence.find(x=>x.id===t.dataset.id);if(e)removeEvidence(e).then(()=>toast('Evidence deleted'))},
   signPrep:()=>{const a=A();put('audits',a.id,{...a,prepBy:me||'local',prepAt:today()})},
-  signRev:()=>{const a=A();put('audits',a.id,{...a,revBy:me||'local',revAt:today(),stage:['Planned','Fieldwork'].includes(a.stage)?'Review':a.stage})},
+  signRev:()=>{const a=A();if(openNotes(a).length)return toast('Clear the '+openNotes(a).length+' open review note'+(openNotes(a).length===1?'':'s')+' before signing as reviewer.');(()=>{const a=A();put('audits',a.id,{...a,revBy:me||'local',revAt:today(),stage:['Planned','Fieldwork'].includes(a.stage)?'Review':a.stage})})()},
   delAudit:()=>{if(ui.armed!=='audit'){ui.armed='audit';return render()}const a=A();S.evidence.filter(e=>e.auditId===a.id).forEach(removeEvidence);del('audits',a.id);go('audits')},
   newObs:()=>{const a=A(),c=C();newObs({clientId:a?.clientId||c?.id||(ui.f.client||S.clients[0]?.id),auditId:a?.id||''})},
   delObs:()=>{if(ui.armed!=='obs'){ui.armed='obs';return render()}const o=S.observations.find(x=>x.id===ui.id);del('observations',o.id);go(o.auditId?'audit-'+o.auditId:'observations')},
@@ -396,7 +400,7 @@ const ACT={
 };
 document.addEventListener('click',e=>{
   const g=e.target.closest('[data-go]');if(g&&!e.target.closest('a,button,input,select,label')){const tab=g.dataset.tab;if(tab){ui.lastId=g.dataset.go.replace(/^(client|audit)-/,'');if(/^audit-/.test(g.dataset.go)){const m={vouching:'vouch',recon:'gst'};if(m[tab]){ui.ptab=m[tab];ui.atab='proc'}else ui.atab=tab}else ui.ctab=tab}go(g.dataset.go);return}
-  const t=e.target.closest('[data-act]');if(!t){if(!e.target.closest('.searchbox'))$('#searchRes').hidden=true;return}
+  const t=e.target.closest('[data-act]');if(!t){const sr=$('#searchRes');if(sr&&!e.target.closest('.searchbox'))sr.hidden=true;return}
   const k=t.dataset.act;if(!['clearSample','delClient','delAudit','delObs','rebuildPlan','genRm','clearRm','evDel'].includes(k))ui.armed=null;
   if(k==='toRoadmap'){const id=(t.getAttribute('href')||'').replace('#client-','');ui.lastId=id;ui.ctab='roadmap';return}
   if(ACT[k]){if(t.tagName==='BUTTON'||(t.tagName==='A'&&t.getAttribute('href')==='#'))e.preventDefault();ACT[k](t)}
@@ -413,7 +417,7 @@ async function handleFiles(kind,files,i){
   const a=A(),c=C();if(!files||!files.length)return;
   if(kind==='audit')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,purpose:'Audit file'});
   if(kind==='item')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,item:+i,purpose:'Check '+(+i+1)});
-  if(['books','brsbank','brsbook','pstmt','pbook','stock','far'].includes(kind))return procFiles(c,kind,files,i);
+  if(['books','brsbank','brsbook','pstmt','pbook','stock','far','payreg','as26'].includes(kind))return procFiles(c,kind,files,i);
   if(kind==='vouch')return importVouchers(c,files[0]);
   if(kind==='rcbooks')return rcBooks(c,files[0]);
   if(kind==='rcportal')return rcPortalFiles(c,[...files]);
@@ -445,7 +449,7 @@ document.addEventListener('submit',e=>{
 });
 
 /* ---------- boot (after every script has loaded) ---------- */
-document.addEventListener('DOMContentLoaded',()=>{route();
+document.addEventListener('DOMContentLoaded',()=>{if(location.hash.startsWith('#respond')&&typeof respondPage==='function'){respondPage();return}route();
 (async()=>{
   if(window.claude?.use){
     try{db=await window.claude.use('db')}catch(e){db=null}

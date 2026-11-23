@@ -26,6 +26,19 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
 
 **Data tests** also include Benford's law (first digits) and bills split just under approval limits.
 
+**Quality and follow-through.**
+- **Risk and control matrix:** every checklist step shows the risk it addresses and whether it is preventive or detective; each is tested for design (effective / weak) and operation. RCM view, CSV, and Annexure G in the report.
+- **Reviewer notes (SIA 350):** on any step, procedure or the whole audit, with replies; the reviewer cannot sign and the audit cannot be reported while a note is open.
+- **Draft findings to management (SIA 360):** the Findings tab creates a 30-day link (online version); management opens it without an account, gives response, owner and target date for each finding, and the auditor puts the answers into the findings in one click (`mgmt_links`, migration 0009).
+- **Reminders:** the Action taken tab lists actions due within a week or past due, with a ready email.
+- **Home:** every client's last-month audits, procedures done, open and past-due findings, escalations, overdue statutory items and open review notes.
+
+**More procedures.**
+- **Payroll verification (HR & payroll):** salary register per month: shared bank account / PAN / UAN (possible ghost employees), missing KYC, PF at 12% of PF wages (₹15,000 ceiling), ESI at 0.75% of gross up to ₹21,000, net pay, pay after leaving, totals vs PF / ESI / TDS challans and the bank transfer, joiners, leavers and pay changes over 20%.
+- **Form 26AS vs books (GST & TDS, optional):** the TRACES text file (or CSV / Excel) against TDS receivable in the books, deductor by deductor.
+- **GST filing dates:** paste the lines of the portal's Track Return Status / View Filed Returns into the due-date tracker.
+- **BRS month by month:** keep each month's reconciliation.
+
 **Import the books once.** The Programme tab takes one Tally Day Book: it feeds vouching, GST & TDS, the bank ledgers (BRS), the debtors and creditors and the analytical review. Annexure F of the report holds the programme and each procedure's result.
 
 1. **Client master.** Enter the entity type, group position, nature of business, regulator, cost-records sector and last year's figures. As you type, the app shows which audits, laws and returns apply, each with its reason and legal basis:
