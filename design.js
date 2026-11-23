@@ -45,7 +45,10 @@ function authBrand(){const d=!_drawn;_drawn=true;return `<section class="auth-br
   <h1>Monthly internal audits, from the books to a signed report.</h1>
   <p class="lede">One place for every client's audit plan, procedures, observations and reports.</p>
   <ul><li>${tickSVG()}<span>Vouching, GST, TDS and bank reconciliations matched from the client's books</span></li><li>${tickSVG()}<span>An observation report after every client visit</span></li><li>${tickSVG()}<span>The month's internal audit report, built from those visits</span></li></ul>
-  ${ledgerArt()}
+  <div class="auth-stage">${ledgerArt()}
+   <div class="chip c1"><i style="background:#17875a"></i><span><b>Bank reconciliation</b>Difference ₹0 · agreed to statement</span></div>
+   <div class="chip c2"><i style="background:#c93a2e"></i><span><b>Observation raised · High</b>Rent paid without a lease</span></div>
+   <div class="chip c3"><i style="background:#2f4bd8"></i><span><b>Visit 3 of 4</b>Observation report ready</span></div></div>
   <p class="foot">Part of 1Go. Opening Smart Auditing from its tile in 1Go signs you in with your 1Go account.</p></section>`}
 const pwField=(id,ac,label,extra='')=>`<div class="fld"><label for="${id}">${label}</label><div class="in"><input id="${id}" type="password" autocomplete="${ac}" minlength="8" required style="padding-right:64px"><button type="button" class="show" data-show="${id}" aria-label="Show password" aria-pressed="false">Show</button></div>${extra}</div>`;
 vLogin=function(){
@@ -59,7 +62,7 @@ vLogin=function(){
      ${m==='in'?'<div class="row-between"><span></span><a href="#" data-act="authMode" data-v="reset">Forgot password?</a></div>':''}
      <button class="btn wide" type="submit">${m==='up'?'Create account':'Sign in'}</button></form>`;
   return `<div class="auth-wrap">${authBrand()}<section class="auth-form"><div class="auth-card">${body}<p class="auth-msg" id="authMsg" role="status" aria-live="polite"></p>
-   <p class="note">Your data stays in your firm's workspace and is shared only with the colleagues you invite.</p></div></section></div>`};
+   <p class="note">Your data stays in your firm's workspace and is shared only with the colleagues you invite. Opening Smart Auditing from its tile in 1Go signs you in with your 1Go account.</p></div></section></div>`};
 vSetup=function(){
   return `<div class="auth-wrap">${authBrand()}<section class="auth-form"><div class="auth-card"><h2>Set up your firm's workspace</h2><p class="sub">A workspace holds one firm's clients, audits and reports. Colleagues join it with its join code.</p>
    <div class="ws-grid"><form class="ws-card" id="wsCreate"><h3>Create a workspace</h3><p>For a new firm or audit team.</p><div class="fld"><label for="ws-name">Firm or team name</label><input id="ws-name" required placeholder="Ameen & Associates"></div><button class="btn wide" type="submit">Create workspace</button></form>
@@ -90,6 +93,7 @@ function penRun(){const svg=document.querySelector('.auth-brand.draw .auth-art')
   kind.forEach((c,i)=>{const y=y0+i*h,d=DL[i];if(c==='q'){k.push({t:d-.02,x:344,y:y-5,o:1},{t:d+.12,x:304,y:y+8,o:1},{t:d+.25,x:265,y:y-4,o:1},{t:d+.38,x:304,y:y-16,o:1},{t:d+.45,x:372,y:y-2,o:1},{t:d+.6,x:410,y:y-1,o:1})}else{k.push({t:d-.04,x:347,y:y-2,o:1},{t:d+.14,x:360,y:y-14,o:1})}});
   k.push({t:TOT-.05,x:352,y:y0+6*h+2,o:1},{t:TOT+.15,x:362,y:y0+6*h-6,o:1},{t:4.5,x:470,y:y0+6*h+60,o:0});
   pen.animate(k.map(p=>({offset:Math.min(1,p.t/T),transform:`translate(${p.x}px,${p.y}px)`,opacity:p.o})),{duration:T*1000,easing:'linear',fill:'both'})}
+document.addEventListener('pointermove',e=>{const st=document.querySelector('.auth-stage');if(!st||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const r=st.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;st.style.setProperty('--rx',(-y*4).toFixed(2)+'deg');st.style.setProperty('--ry',(x*6).toFixed(2)+'deg')});
 /* ---------- after every render: auth layout, view fade, ticks ---------- */
 const _render0=render;let _lastView='';
 render=function(){_render0();
