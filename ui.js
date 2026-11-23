@@ -1,7 +1,7 @@
 /* Smart Auditing — interface. Views render from S (data) and ui (state); routes live in the URL hash. */
 const IC={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',clients:'<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6M8 11h.01M12 11h.01M16 11h.01"/>',audit:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M9 11.5l2 2 4-4M9 17h6"/>',flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',report:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',clip:'<path d="m20 11.5-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/>',up:'<path d="M12 16V4M6.5 9.5 12 4l5.5 5.5M4 20h16"/>',down:'<path d="M12 4v12M6.5 10.5 12 16l5.5-5.5M4 20h16"/>',plus:'<path d="M12 5v14M5 12h14"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',zip:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M10 6h2M10 9h2M10 12h2M10 15h2v3h-2z"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
-const VIEWS=['home','clients','new-client','client','edit','audits','audit','observations','obs','roadmap','vouching','reports','report'];
+const VIEWS=['home','clients','new-client','client','edit','audits','audit','observations','obs','roadmap','vouching','recon','reports','report'];
 const go=h=>{if(location.hash==='#'+h)route();else location.hash=h};
 function route(){
   const h=location.hash.slice(1)||'home',m=h.match(/^(client|audit|obs|edit|report)-(.+)$/);
@@ -25,7 +25,7 @@ function setTop(crumbs,action=''){
   $('#topAction').innerHTML=action;
 }
 function sideNav(){
-  const v=ui.view,map={client:'clients',edit:'clients','new-client':'clients',audit:'audits',obs:'observations'};
+  const v=ui.view,map={client:'clients',edit:'clients','new-client':'clients',audit:'audits',obs:'observations',vouching:'audits',recon:'audits'};
   const on=map[v]||v,act=S.audits.filter(a=>!['Reported','Closed'].includes(a.stage)).length,open=S.observations.filter(o=>o.status!=='Closed').length;
   document.querySelectorAll('.nav a').forEach(a=>{a.classList.toggle('on',a.dataset.v===on);const n=a.querySelector('.n');if(n)n.textContent=a.dataset.v==='audits'?(act||''):a.dataset.v==='observations'?(open||''):''});
 }
@@ -40,7 +40,7 @@ function render(){
   const m=$('#main');sideNav();railStatus();
   if(mode==='supa'&&!session){setTop([['Sign in']]);m.innerHTML=vLogin();return}
   if(mode==='supa'&&!ws){setTop([['Team workspace']]);m.innerHTML=loggingIn?'<p class="sub">Loading your workspace…</p>':vSetup();return}
-  const V={home:vHome,clients:vClients,'new-client':()=>vClientForm(null),edit:()=>vClientForm(C()),client:vClient,audits:vAudits,audit:vAudit,observations:vObsList,obs:vObs,roadmap:vRoadmap,vouching:()=>vVouching(),reports:vReports};
+  const V={home:vHome,clients:vClients,'new-client':()=>vClientForm(null),edit:()=>vClientForm(C()),client:vClient,audits:vAudits,audit:vAudit,observations:vObsList,obs:vObs,roadmap:vRoadmap,vouching:()=>vVouching(),recon:()=>vRecon(),reports:vReports};
   let html;try{html=(V[ui.view]||vHome)()}catch(e){console.error(e);html=`<div class="empty">Something went wrong showing this page (${esc(e.message)}). <a href="#home">Back to home</a></div>`}
   m.innerHTML=(mode==='preview'?'<div class="banner">Preview mode: changes stay in this tab only and are lost on reload.</div>':'')+html;
   if(ui.view==='new-client'||ui.view==='edit')livePreview();
@@ -130,8 +130,8 @@ function vClient(){
   const L=applicability(c),y=L.filter(a=>a.st==='yes').length,ch=L.filter(a=>a.st==='check').length,R=c.roadmap,its=R?.items||[],dn=its.filter(i=>rmStatus(i,R.fy)==='done').length;
   const au=S.audits.filter(a=>a.clientId===c.id),ob=S.observations.filter(o=>o.clientId===c.id),op=ob.filter(o=>o.status!=='Closed'),ev=S.evidence.filter(e=>e.clientId===c.id);
   setTop([['Clients','clients'],[c.name]],`<a class="btn ghost" href="#edit-${c.id}">${ic('edit')}Edit master</a><button class="btn" data-act="tab" data-tab="audits" data-new="1">${ic('plus')}New audit</button>`);
-  const vd=S.vouching.find(v=>v.clientId===c.id&&v.fy===fyNow());const tabs=[['overview','Overview'],['roadmap','Roadmap',its.length],['vouching','Vouching',vd?Object.keys(vd.types||{}).length:''],['audits','Audits',au.length],['observations','Findings',op.length],['evidence','Evidence',ev.length]];
-  const body={overview:()=>clientOverview(c,L),roadmap:()=>roadmapBoard(c),vouching:()=>vouchingTab(c),audits:()=>clientAudits(c,au),observations:()=>obsTable(ob,{client:c}),evidence:()=>evidenceList(ev,{showAudit:true})}[ui.ctab]||(()=>clientOverview(c,L));
+  const vd=S.vouching.find(v=>v.clientId===c.id&&v.fy===fyNow());const tabs=[['overview','Overview'],['roadmap','Roadmap',its.length],['audits','Audits',au.length],['observations','Findings',op.length],['evidence','Evidence',ev.length]];
+  const body={overview:()=>clientOverview(c,L),roadmap:()=>roadmapBoard(c),audits:()=>clientAudits(c,au),observations:()=>obsTable(ob,{client:c}),evidence:()=>evidenceList(ev,{showAudit:true})}[ui.ctab]||(()=>clientOverview(c,L));
   return `<div class="head"><div class="titles"><h1>${esc(c.name)}</h1><div class="chips"><span class="chip">${esc(ENT[c.type]||'')}</span>${isSmall(c)?'<span class="chip">Small company</span>':''}<span class="chip">${esc(BIZ[c.biz]||'')}</span>${c.reg&&c.reg!=='none'?`<span class="chip">${esc(REG[c.reg])}</span>`:''}${c.system?`<span class="chip">Books in ${esc(c.system)}</span>`:''}<span class="chip">Turnover ₹${esc(c.turnover||0)} cr</span></div></div></div>
   <div class="kpis"><div class="kpi"><b>${y}</b><span>Requirements apply${ch?` (+${ch} to check)`:''}</span></div><div class="kpi ${its.length&&dn===its.length?'good':''}"><b>${its.length?pct(dn,its.length)+'%':'—'}</b><span>Roadmap covered</span></div><div class="kpi"><b>${au.filter(a=>!['Reported','Closed'].includes(a.stage)).length}</b><span>Audits in progress</span></div><div class="kpi ${op.some(o=>o.rating==='H')?'alert':''}"><b>${op.length}</b><span>Open findings</span></div><div class="kpi"><b>${ev.length}</b><span>Evidence files</span></div></div>
   <div class="tabs" role="tablist">${tabs.map(([k,l,n])=>`<button role="tab" aria-selected="${ui.ctab===k}" class="${ui.ctab===k?'on':''}" data-act="tab" data-tab="${k}">${l}${n?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>${body()}`;
@@ -190,21 +190,26 @@ function vRoadmap(){
 function vAudits(){
   setTop([['Audits']],S.clients.length?`<button class="btn" data-act="addAudit">${ic('plus')}New audit</button>`:'');
   const f=ui.f.stage,L=S.audits.filter(a=>!f||a.stage===f).sort((a,b)=>STAGES.indexOf(a.stage)-STAGES.indexOf(b.stage));
-  return `<div class="head"><div class="titles"><h1>Audits</h1><p class="sub">One process, one client, one period: checklist, evidence, data tests, review and report.</p></div></div>
+  return `<div class="head"><div class="titles"><h1>Audits</h1><p class="sub">One process, one client, one period: checklist, data tests, vouching, GST &amp; TDS reconciliations, evidence, review and report.</p></div></div>${auditSubnav('audits')}
   ${ui.adding==='audit'?auditForm(null):''}
   <div class="row" style="margin-bottom:12px">${['',...STAGES].map(s=>`<button class="chip" data-act="stageFilter" data-v="${s}" style="${f===s?'border-color:var(--acc);color:var(--acc-ink);font-weight:700':''}">${s||'All'} <span class="muted">${s?S.audits.filter(a=>a.stage===s).length:S.audits.length}</span></button>`).join('')}</div>
   ${L.length?auditTable(L):`<div class="empty">${S.clients.length?'No audits here yet.':'Add a client first.'}</div>`}`;
 }
+/* vouching and the GST / TDS reconciliations are audit procedures: done inside an audit, shared by the client's audits of the same year */
+function procNote(c){return `<p class="small muted" style="margin:-4px 0 12px">Audit procedure for ${esc(c.name||'')}, FY ${esc(fyNow())}. The data and results are shared by this client's audits of the year and go into this audit's report.</p>`}
+function auditSubnav(on){return `<div class="tabs" role="tablist" style="margin-top:-6px">${[['audits','All audits'],['vouching','Vouching status'],['recon','GST & TDS status']].map(([k,l])=>`<a role="tab" class="${on===k?'on':''}" href="#${k}" style="padding:10px 14px;text-decoration:none;color:inherit;${on===k?'border-bottom:2px solid var(--acc);font-weight:600':''}">${l}</a>`).join('')}</div>`}
+function auditFor(c){const L=S.audits.filter(a=>a.clientId===c.id);return L.find(a=>!['Reported','Closed'].includes(a.stage))||L[L.length-1]||null}
 function vAudit(){
   const a=A();if(!a)return notFound('Audit','audits');
   const c=S.clients.find(x=>x.id===a.clientId)||{},t=a.items.filter(i=>i.r).length,e=a.items.filter(i=>i.r==='ex').length,ev=auditEvidence(a),obs=S.observations.filter(o=>o.auditId===a.id),si=STAGES.indexOf(a.stage);
   resolveNames([a.prepBy,a.revBy,...ev.map(x=>x.uploadedBy)]);
   setTop([['Audits','audits'],[c.name||'Client','client-'+c.id],[a.title]],`<button class="btn" data-act="tab" data-tab="report">${ic('report')}Report</button>`);
-  const tabs=[['checklist','Checklist',`${t}/${a.items.length}`],['tests','Data tests',a.tests?a.tests.res.reduce((s,r)=>s+(r.total?1:0),0)||'':''],['evidence','Evidence',ev.length],['observations','Findings',obs.length],['signoff','Sign-off'],['report','Report']];
-  const body={checklist:()=>checklistTab(a,ev,obs),tests:()=>testsTab(a),evidence:()=>`<label class="drop" data-drop="audit">${ic('up')}<b>Drop evidence files here or click to upload</b><span class="small">Excel workings, ledgers, PDFs, screenshots, confirmations · linked to this audit</span><input type="file" data-file="audit" multiple hidden></label><div style="margin-top:10px">${evidenceList(ev,{audit:a})}</div>`,observations:()=>`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="newObs">${ic('plus')}New finding</button></div>${obsTable(obs,{})}`,signoff:()=>signoffTab(a),report:()=>reportTab(a)}[ui.atab]||(()=>checklistTab(a,ev,obs));
+  const tabs=[['checklist','Checklist',`${t}/${a.items.length}`],['tests','Data tests',a.tests?a.tests.res.reduce((s,r)=>s+(r.total?1:0),0)||'':''],['vouching','Vouching',(()=>{const d=vdoc(c);return d?Object.keys(d.types||{}).length||'':''})()],['recon','GST & TDS',''],['evidence','Evidence',ev.length],['observations','Findings',obs.length],['signoff','Sign-off'],['report','Report']];
+  const body={checklist:()=>checklistTab(a,ev,obs),tests:()=>testsTab(a),vouching:()=>procNote(c)+vouchingTab(c),recon:()=>procNote(c)+reconTab(c),evidence:()=>`<label class="drop" data-drop="audit">${ic('up')}<b>Drop evidence files here or click to upload</b><span class="small">Excel workings, ledgers, PDFs, screenshots, confirmations · linked to this audit</span><input type="file" data-file="audit" multiple hidden></label><div style="margin-top:10px">${evidenceList(ev,{audit:a})}</div>`,observations:()=>`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="newObs">${ic('plus')}New finding</button></div>${obsTable(obs,{})}`,signoff:()=>signoffTab(a),report:()=>reportTab(a)}[ui.atab]||(()=>checklistTab(a,ev,obs));
   return `<div class="head"><div class="titles"><h1>${esc(a.title)}</h1><p class="sub"><a href="#client-${c.id}">${esc(c.name||'')}</a> · ${esc(a.period||'Period not set')}${a.due?' · fieldwork due '+fmtD(a.due):''}</p></div></div>
   <div class="stepper" role="group" aria-label="Audit stage">${STAGES.map((s,i)=>`<button data-act="stage" data-v="${s}" class="${i<si?'done':i===si?'cur':''}" aria-pressed="${i===si}">${s}</button>`).join('')}</div>
   <div class="row small muted" style="margin:8px 0 4px;gap:16px"><span><b style="color:var(--ink)">${t}/${a.items.length}</b> checks tested</span><span><b class="${e?'over':''}" style="${e?'':'color:var(--ink)'}">${e}</b> exception${e===1?'':'s'}</span><span><b style="color:var(--ink)">${ev.length}</b> evidence file${ev.length===1?'':'s'}</span><span><b style="color:var(--ink)">${obs.length}</b> finding${obs.length===1?'':'s'}</span><span>${a.revBy?'<span class="tag g">Reviewed</span>':a.prepBy?'<span class="tag y">Awaiting review</span>':'<span class="tag n">Not signed</span>'}</span></div>
+  ${mandCard(c)}
   <div class="tabs" role="tablist">${tabs.map(([k,l,n])=>`<button role="tab" aria-selected="${ui.atab===k}" class="${ui.atab===k?'on':''}" data-act="tab" data-tab="${k}">${l}${n!==''&&n!=null?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>${body()}`;
 }
 function checklistTab(a,ev,obs){
@@ -304,6 +309,7 @@ function reportBody(a){
   ${ev.some(e=>e.summary)?`<h2>Annexure B — Spreadsheet evidence</h2>${ev.filter(e=>e.summary).map(e=>`<h3>${eref(a,e.id)} · ${esc(e.name)}</h3><table><thead><tr><th>Sheet</th><th>Rows</th><th>Columns</th><th>Headers</th></tr></thead><tbody>${e.summary.map(s=>`<tr>${td(s.name)}${td(s.rows)}${td(s.cols)}${td(s.header.filter(Boolean).join(', '))}</tr>`).join('')}</tbody></table>`).join('')}`:''}
   ${a.tests?`<h2>Annexure C — Data tests</h2><p>${esc(a.tests.file)}${a.tests.evidenceId?' ('+eref(a,a.tests.evidenceId)+')':''}, ${a.tests.rows} rows, tested ${fmtD(a.tests.at)}.</p><table><thead><tr><th>Test</th><th>Items found</th><th>Why it matters</th></tr></thead><tbody>${a.tests.res.map(r=>`<tr>${td(r.name)}${td(r.total)}${td(r.why)}</tr>`).join('')}</tbody></table>`:''}
   ${vouchReport(a)}
+  ${reconReport(a)}
   <p style="margin-top:26px">Prepared by: <b>${esc(who(a.prepBy))}</b>${a.prepAt?' ('+fmtD(a.prepAt)+')':''} &nbsp;·&nbsp; Reviewed by: <b>${esc(who(a.revBy))}</b>${a.revAt?' ('+fmtD(a.revAt)+')':''}</p>`;
 }
 function reportDoc(a){return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(a.title)+' - internal audit report</title><style>body{font:14px/1.5 Calibri,Arial,sans-serif;max-width:920px;margin:30px auto;padding:0 20px;color:#141a33}table{border-collapse:collapse;width:100%;margin:8px 0}th,td{border:1px solid #ccd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f3f4f9}h1{font-size:26px}h2{font-size:17px;margin-top:26px;border-bottom:2px solid #141a33;padding-bottom:4px}h3{font-size:15px}</style></head><body>'+reportBody(a)+'</body></html>'}
@@ -339,7 +345,7 @@ function newAudit(clientId,t,period,due,o={}){
 function newObs(pre){ui.draft={rating:'M',status:'Open',evidence:[],...pre};go('obs-new')}
 const dlFile=(filename,data)=>{if(!dl)return toast('Download is not available here');dl.save({filename,data}).then(()=>{},er=>toast(er.code==='declined'?'Download cancelled':'Download is not available here'))};
 const ACT={
-  tab:t=>{if(ui.view==='client'){ui.ctab=t.dataset.tab;ui.adding=t.dataset.new?'audit':null}else if(ui.view==='audit')ui.atab=t.dataset.tab;render()},
+  tab:t=>{if(ui.view==='client'){ui.ctab=t.dataset.tab;ui.adding=t.dataset.new?'audit':null}else if(ui.view==='audit'){ui.atab=t.dataset.tab;if(t.dataset.rt)ui.rtab=t.dataset.rt}render()},
   signout:()=>sb.auth.signOut(),
   switchWs:()=>{ws=null;if(channel){sb.removeChannel(channel);channel=null}render()},
   ws:t=>{const w=wsList.find(x=>x.id===t.dataset.id);if(w)openWorkspace(w).then(()=>go('home'))},
@@ -360,7 +366,7 @@ const ACT={
   rmDone:t=>{const c=C();saveRoadmap(c,{...c.roadmap,items:c.roadmap.items.map(i=>i.id===t.dataset.id?{...i,done:!i.done}:i)})},
   rmDel:t=>{const c=C();saveRoadmap(c,{...c.roadmap,items:c.roadmap.items.filter(i=>i.id!==t.dataset.id)})},
   addreq:t=>{const c=C(),a=applicability(c).find(x=>x.name===t.dataset.name),m=COMPLIANCE[a.name],cq=Math.min(curQ(c.roadmap.fy),3),add=m?m[2].map(q=>({area:m[0],title:m[1],q:Math.max(q,cq)})):[{area:a.areas[0],title:AREA_NAME(a.areas[0])+' review',q:cq}];saveRoadmap(c,{...c.roadmap,items:[...c.roadmap.items,...add.map(x=>({id:nid(),source:'manual',done:false,auditId:'',why:'Required: '+a.name,req:a.name,...x}))]})},
-  stage:t=>{const a=A();put('audits',a.id,{...a,stage:t.dataset.v})},
+  stage:t=>{const a=A(),v=t.dataset.v;if(['Reported','Closed'].includes(v)){const c=S.clients.find(x=>x.id===a.clientId),m=c&&mandatory(c);if(m&&!m.done)return toast('Finish the mandatory procedures first: '+[m.vouch.st!=='done'&&'vouching',m.gst.st!=='done'&&'GST reconciliations'].filter(Boolean).join(' and ')+'.')}put('audits',a.id,{...a,stage:v})},
   res:t=>{const a=A(),i=+t.dataset.i,v=a.items[i].r===t.dataset.v?'':t.dataset.v;put('audits',a.id,{...a,items:a.items.map((x,k)=>k===i?{...x,r:v}:x),stage:a.stage==='Planned'?'Fieldwork':a.stage})},
   raise:t=>{const a=A(),i=+t.dataset.i,it=a.items[i];newObs({clientId:a.clientId,auditId:a.id,item:i,title:it.q.replace(/^(.)/,s=>s.toUpperCase())+': exception',condition:it.n||'',criteria:it.q,evidence:S.evidence.filter(e=>e.auditId===a.id&&e.item===i).map(e=>e.id)})},
   testObs:t=>{const a=A(),r=a.tests.res.find(x=>x.key===t.dataset.k);newObs({clientId:a.clientId,auditId:a.id,title:r.name+' in '+a.title.toLowerCase(),condition:`${r.total} entries found in ${a.tests.file} (${a.tests.rows} rows). Examples: `+r.hits.slice(0,3).map(h=>`${h.date} ${h.party} ${inr(h.amount)}`).join('; ')+'.',criteria:r.why,evidence:a.tests.evidenceId?[a.tests.evidenceId]:[]})},
@@ -379,7 +385,7 @@ const ACT={
   toRoadmap:()=>{ui.ctab='roadmap';ui.lastId=null}
 };
 document.addEventListener('click',e=>{
-  const g=e.target.closest('[data-go]');if(g&&!e.target.closest('a,button,input,select,label')){const tab=g.dataset.tab;if(tab){ui.lastId=g.dataset.go.replace(/^client-/,'');ui.ctab=tab}go(g.dataset.go);return}
+  const g=e.target.closest('[data-go]');if(g&&!e.target.closest('a,button,input,select,label')){const tab=g.dataset.tab;if(tab){ui.lastId=g.dataset.go.replace(/^(client|audit)-/,'');if(/^audit-/.test(g.dataset.go))ui.atab=tab;else ui.ctab=tab}go(g.dataset.go);return}
   const t=e.target.closest('[data-act]');if(!t){if(!e.target.closest('.searchbox'))$('#searchRes').hidden=true;return}
   const k=t.dataset.act;if(!['clearSample','delClient','delAudit','delObs','rebuildPlan','genRm','clearRm','evDel'].includes(k))ui.armed=null;
   if(k==='toRoadmap'){const id=(t.getAttribute('href')||'').replace('#client-','');ui.lastId=id;ui.ctab='roadmap';return}
@@ -398,6 +404,9 @@ async function handleFiles(kind,files,i){
   if(kind==='audit')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,purpose:'Audit file'});
   if(kind==='item')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,item:+i,purpose:'Check '+(+i+1)});
   if(kind==='vouch')return importVouchers(c,files[0]);
+  if(kind==='rcbooks')return rcBooks(c,files[0]);
+  if(kind==='rcportal')return rcPortalFiles(c,[...files]);
+  if(kind==='rctds')return rcTdsFile(c,files[0]);
   if(kind==='vev'){const {d,type,t:T}=curV(),ix=+i,x=T.sample[ix];const ids=await uploadFiles(files,{clientId:c.id,purpose:`Vouching: ${VSHORT[type]} ${x.vno||''}`});const cur=S.vouching.find(v=>v.id===d.id)||d,ct=cur.types[type];return saveT(cur,type,{...ct,sample:ct.sample.map((y,k)=>k===ix?{...y,ev:[...(y.ev||[]),...ids]}:y)})}
   if(kind==='roadmap'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no rows under the header.');const items=parseRoadmap(rows),R=c.roadmap||{fy:fyNow(),items:[]};await saveRoadmap(c,{...R,items:[...R.items,...items],uploadedAt:today(),uploadFile:f.name});toast(items.length+' roadmap items added from '+f.name)}catch(er){toast(er.message)}return}
   if(kind==='ledger'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no data rows.');const T=runTests(rows,f.name);let evId='';try{evId=(await uploadFiles([f],{clientId:a.clientId,auditId:a.id,purpose:'Ledger used for data tests'}))[0]||''}catch(er){}const cur=S.audits.find(x=>x.id===a.id)||a;await put('audits',a.id,{...cur,tests:{...T,evidenceId:evId},stage:cur.stage==='Planned'?'Fieldwork':cur.stage});toast(T.rows+' rows tested')}catch(er){toast(er.message)}}

@@ -22,7 +22,10 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
    - **Ticking off:** an item counts as done when its audit is reported or closed.
 4. **Audit workspace.** A stage stepper (Planned → Fieldwork → Review → Reported → Closed) and these tabs:
    - **Checklist:** for each check, mark Satisfactory, Exception or N/A, write working notes and attach evidence.
+   - **Mandatory procedures card:** vouching and the four GST reconciliations are required in every audit (TDS vs books is optional, only where the client deducts TDS). The audit cannot be moved to Reported or Closed until both are done.
    - **Data tests:** upload a ledger as Excel or CSV. It is tested for duplicates, round sums, Sunday entries, cash above ₹10,000 and the top 1% by value, and the ledger is kept as evidence.
+   - **Vouching:** see below (SIA 320 evidence, SIA 5 sampling).
+   - **GST & TDS:** see below (SIA 150 compliance with laws).
    - **Evidence:** drag-and-drop files. Each file is fingerprinted with SHA-256, and spreadsheets get a summary of their sheets, rows and headers.
    - **Findings:** condition, criteria, cause, effect, rating, action plan and linked evidence.
    - **Sign-off:** preparer and reviewer (SIA 350).
@@ -37,10 +40,12 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
    - **Annexure A:** evidence index with SHA-256 fingerprints.
    - **Annexure B:** spreadsheet evidence.
    - **Annexure C:** data tests.
+   - **Annexure D:** vouching (says "Not completed" if it is not done).
+   - **Annexure E:** GST and TDS reconciliations, with the auditor's conclusion on each.
 
    Download the report as an HTML file (opens in Word), or as a ZIP with every evidence file and an index CSV.
 
-**Vouching (same method for every client):**
+**Vouching (an audit procedure; same method for every client):** done in the audit's Vouching tab; the data is shared by the client's audits of the same financial year.
 - **Import:** a Tally Day Book XML (UTF-16 or UTF-8), or a voucher or GST register as CSV/Excel from any software.
 - **Classify:** each voucher becomes a purchase, sales, purchase return (debit note), sales return (credit note), payment, receipt or journal.
 - **Analyse each type:** value bands; local (CGST + SGST), interstate (IGST) and non-GST; parties without GSTIN; top parties; monthly pattern.
@@ -51,6 +56,13 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
   - **Other methods:** random, systematic and stratified are also available.
   - **Repeatable:** the same data and seed always give the same sample.
 - **Worksheet:** each sampled voucher has a checklist for its type, a result, a misstatement amount, a note and evidence. Errors are projected to the population and compared with the tolerable error; exceptions can be raised as findings, and the results appear in the audit report as Annexure D.
+
+**GST & TDS reconciliations (an audit procedure):** done in the audit's GST & TDS tab.
+- **Books:** Tally Day Book XML (sales, purchases, credit / debit notes and TDS ledgers), or CSV / Excel registers.
+- **Portal files:** GSTR-1 JSON or ZIP, GSTR-2B Excel or JSON, GSTR-3B JSON (or the summary template), TDS challan list. Or **Get from 1Go** (team version): 1Go downloads them from the portals on your computer and sends them here; the matching is done only in Smart Auditing.
+- **The five reconciliations:** GSTR-1 vs sales books, GSTR-2B vs purchase books (invoice by invoice: only in books, only in the return, value differs, GSTIN differs, different month, ITC not available), GSTR-3B vs GSTR-1, GSTR-3B vs GSTR-2B, and TDS vs books (due dates, carried-forward shortfall, interest estimate, challans not in the books).
+- **Each one:** month-wise table, CSV, "Raise finding" (linked to the audit), and the auditor's conclusion and notes.
+- **Get from 1Go:** a one-time request (token kept only as its SHA-256, valid 2 hours) and an `onego://smart-auditing` link; needs 1Go 1.66.0 or later.
 
 **Team workspaces:** you sign in with email and password, create a workspace, and colleagues join with its join code. Postgres row-level security and Storage policies make each workspace's records and files visible only to its members.
 
