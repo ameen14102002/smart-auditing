@@ -1,10 +1,10 @@
 /* Smart Auditing — logo, sign-in / create account / password reset, workspace setup, and motion that answers actions. */
 const RECOVERY=/type=recovery/.test(location.hash);
 /* the mark: a ledger page with three rulings and the auditor's tick */
-function logoSVG(size,o={}){return `<svg class="logo${o.draw?' draw':''}" viewBox="0 0 40 40" width="${size}" height="${size}" role="img" aria-label="Smart Auditing"><rect width="40" height="40" rx="10" fill="${o.bg||'#2f4bd8'}"/><path d="M9 12.5h22M9 19.5h22M9 26.5h12" stroke="#fff" stroke-opacity=".3" stroke-width="2" stroke-linecap="round"/><path class="tick" pathLength="30" d="M12.5 21.5l5 5L29.5 13" fill="none" stroke="${o.tick||'#fff'}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
+let _lg=0;function logoSVG(size,o={}){const n=++_lg,small=size<=24;return `<svg class="logo${o.draw?' draw':''}" viewBox="0 0 48 48" width="${size}" height="${size}" role="img" aria-label="Smart Auditing"><defs><linearGradient id="lgb${n}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22397f"/><stop offset="1" stop-color="#0c1a3d"/></linearGradient><linearGradient id="lgt${n}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2fbf83"/><stop offset="1" stop-color="#7ef0bd"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgb${n})"/><rect x=".75" y=".75" width="46.5" height="46.5" rx="11.25" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1.5"/>${small?'':'<path d="M10 34.5h11M10 40h19" stroke="#fff" stroke-opacity=".32" stroke-width="2.6" stroke-linecap="round"/>'}<path class="tick" pathLength="30" d="${small?'M11 24l8 8L37 12':'M10.5 21l7.5 7.5L39 7.5'}" fill="none" stroke="url(#lgt${n})" stroke-width="${small?5.5:4.6}" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
 const tickSVG=(c='#4fd39b')=>`<svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="none" stroke="${c}" stroke-opacity=".35" stroke-width="1.5"/><path class="tick" pathLength="20" d="M6.5 11.5l3 3 6-7" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 (function brand(){const b=document.querySelector('.side .brand');if(b)b.innerHTML=`<span class="mark">${logoSVG(34)}</span><span>Smart Auditing<small>Monthly internal audit</small></span>`;
-  const fav=document.createElement('link');fav.rel='icon';fav.href='data:image/svg+xml,'+encodeURIComponent(logoSVG(64).replace('class="logo"','xmlns="http://www.w3.org/2000/svg"'));document.head.appendChild(fav);
+  const fav=document.createElement('link');fav.rel='icon';fav.href='data:image/svg+xml,'+encodeURIComponent(logoSVG(16).replace('class="logo"','xmlns="http://www.w3.org/2000/svg"'));document.head.appendChild(fav);
   const h=document.querySelector('.nav a[data-v="home"]');if(h)h.lastChild.textContent='Dashboard';})();
 
 /* ---------- sign-in, create account, reset ---------- */
@@ -41,7 +41,7 @@ const ledgerArt=()=>{const F='font-family="IBM Plex Sans,sans-serif"',SF='font-f
  </svg>`};
 
 let _drawn=false;
-function authBrand(){const d=!_drawn;_drawn=true;return `<section class="auth-brand${d?' draw':''}">${logoSVG(72,{draw:d,bg:'#2f4bd8'})}
+function authBrand(){const d=!_drawn;_drawn=true;return `<section class="auth-brand${d?' draw':''}">${logoSVG(64,{draw:d})}
   <h1>Monthly internal audits, from the books to a signed report.</h1>
   <p class="lede">One place for every client's audit plan, procedures, observations and reports.</p>
   <ul><li>${tickSVG()}<span>Vouching, GST, TDS and bank reconciliations matched from the client's books</span></li><li>${tickSVG()}<span>An observation report after every client visit</span></li><li>${tickSVG()}<span>The month's internal audit report, built from those visits</span></li></ul>
@@ -102,6 +102,7 @@ render=function(){_render0();
   if(RECOVERY&&session&&mode==='supa'){document.getElementById('main').innerHTML=vLogin()}
   const m=document.getElementById('main'),key=ui.view+'|'+ui.id+'|'+(ui.atab||'')+'|'+(ui.ctab||'');if(key!==_lastView){m.classList.remove('enter');void m.offsetWidth;m.classList.add('enter');_lastView=key}
   for(const b of document.querySelectorAll('.seg button.ok.on'))if(!b.querySelector('.tk'))b.insertAdjacentHTML('afterbegin','<svg class="tk" viewBox="0 0 14 14" aria-hidden="true"><path pathLength="20" d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  for(const t of document.querySelectorAll('.tabs')){const on=t.querySelector('button.on');let ind=t.querySelector('.ind');if(!on){ind&&ind.remove();continue}if(!ind){ind=document.createElement('span');ind.className='ind';t.appendChild(ind);ind.style.transition='none'}const prev=t.dataset.k===t.textContent.length+'';if(!prev)ind.style.transition='none';ind.style.left=on.offsetLeft+'px';ind.style.width=on.offsetWidth+'px';t.dataset.k=t.textContent.length;if(!prev){void ind.offsetWidth;ind.style.transition=''}}
   if(ui.justTick!=null){const b=document.querySelector(`.seg button.ok.on[data-i="${ui.justTick}"]`);if(b)b.classList.add('just');ui.justTick=null}
   if(ui.justReady){for(const t of document.querySelectorAll('.tag.g'))if(/Ready to report/.test(t.textContent))t.classList.add('pop');ui.justReady=false}};
 const _res=ACT.res;ACT.res=t=>{const a=A(),i=+t.dataset.i;if(t.dataset.v==='ok'&&a.items[i].r!=='ok')ui.justTick=i;
