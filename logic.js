@@ -20,7 +20,7 @@ const RES=[['','Not tested'],['ok','Satisfactory'],['ex','Exception'],['na','Not
 const STAGES=['Planned','Fieldwork','Review','Reported','Closed'];
 const OSTAT=['Open','In progress','Closed'];
 const RLABEL={H:'High',M:'Medium',L:'Low'};
-const S={clients:[],audits:[],observations:[],evidence:[]};
+const S={clients:[],audits:[],observations:[],evidence:[],vouching:[]};
 const ui={view:'home',id:null,ctab:'overview',atab:'checklist',f:{client:'',rating:'',status:'open',stage:''},armed:null,draft:null,lastId:null};
 let db=null,users=null,dl=null,me=null,live=false,names={},pending=false;
 /* Hosted mode: Supabase (public URL + publishable key; data is protected by row-level security). */
@@ -60,7 +60,7 @@ function subscribe(){
     },e=>{clearTimeout(timer);$('#status').textContent='Data unavailable ('+e.code+')'});
   }
 }
-function schedule(){const a=document.activeElement;if(a&&a.closest&&a.closest('#main')&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){pending=true;return}render()}
+function schedule(){clearTimeout(schedule.t);schedule.t=setTimeout(()=>{const a=document.activeElement;if(a&&a.closest&&a.closest('#main')&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)&&a.type!=='checkbox'&&a.type!=='file'){pending=true;return}render()},30)}
 document.addEventListener('focusout',()=>setTimeout(()=>{if(pending){const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))){pending=false;render()}}},50));
 async function resolveNames(ids){
   const miss=[...new Set(ids)].filter(i=>i&&!(i in names));if(!users||!miss.length)return;

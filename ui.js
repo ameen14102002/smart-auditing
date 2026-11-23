@@ -1,7 +1,7 @@
 /* Smart Auditing — interface. Views render from S (data) and ui (state); routes live in the URL hash. */
 const IC={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',clients:'<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6M8 11h.01M12 11h.01M16 11h.01"/>',audit:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M9 11.5l2 2 4-4M9 17h6"/>',flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',report:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',clip:'<path d="m20 11.5-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/>',up:'<path d="M12 16V4M6.5 9.5 12 4l5.5 5.5M4 20h16"/>',down:'<path d="M12 4v12M6.5 10.5 12 16l5.5-5.5M4 20h16"/>',plus:'<path d="M12 5v14M5 12h14"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',zip:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M10 6h2M10 9h2M10 12h2M10 15h2v3h-2z"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
-const VIEWS=['home','clients','new-client','client','edit','audits','audit','observations','obs','roadmap','reports','report'];
+const VIEWS=['home','clients','new-client','client','edit','audits','audit','observations','obs','roadmap','vouching','reports','report'];
 const go=h=>{if(location.hash==='#'+h)route();else location.hash=h};
 function route(){
   const h=location.hash.slice(1)||'home',m=h.match(/^(client|audit|obs|edit|report)-(.+)$/);
@@ -40,7 +40,7 @@ function render(){
   const m=$('#main');sideNav();railStatus();
   if(mode==='supa'&&!session){setTop([['Sign in']]);m.innerHTML=vLogin();return}
   if(mode==='supa'&&!ws){setTop([['Team workspace']]);m.innerHTML=loggingIn?'<p class="sub">Loading your workspace…</p>':vSetup();return}
-  const V={home:vHome,clients:vClients,'new-client':()=>vClientForm(null),edit:()=>vClientForm(C()),client:vClient,audits:vAudits,audit:vAudit,observations:vObsList,obs:vObs,roadmap:vRoadmap,reports:vReports};
+  const V={home:vHome,clients:vClients,'new-client':()=>vClientForm(null),edit:()=>vClientForm(C()),client:vClient,audits:vAudits,audit:vAudit,observations:vObsList,obs:vObs,roadmap:vRoadmap,vouching:()=>vVouching(),reports:vReports};
   let html;try{html=(V[ui.view]||vHome)()}catch(e){console.error(e);html=`<div class="empty">Something went wrong showing this page (${esc(e.message)}). <a href="#home">Back to home</a></div>`}
   m.innerHTML=(mode==='preview'?'<div class="banner">Preview mode: changes stay in this tab only and are lost on reload.</div>':'')+html;
   if(ui.view==='new-client'||ui.view==='edit')livePreview();
@@ -106,7 +106,7 @@ function vClientForm(c){
   setTop(ed?[['Clients','clients'],[c.name,'client-'+c.id],['Edit master']]:[['Clients','clients'],['New client']]);
   return `<div class="head"><div class="titles"><h1>${ed?'Edit client master':'New client'}</h1><p class="sub">These details decide which audits, laws and returns apply. Use the last financial year's audited figures, in ₹ crore.</p></div></div>
   <div class="grid2"><form id="clientForm">
-   <fieldset><legend>Identity</legend><div class="form"><label class="f wide">Client name<input id="cf-name" required value="${esc(c.name)}"></label><label class="f">Industry<input id="cf-ind" value="${esc(c.industry)}"></label><label class="f">Accounting system<input id="cf-sys" placeholder="e.g. Tally, Zoho Books, SAP" value="${esc(c.system)}"></label></div></fieldset>
+   <fieldset><legend>Identity</legend><div class="form"><label class="f wide">Client name<input id="cf-name" required value="${esc(c.name)}"></label><label class="f">Industry<input id="cf-ind" value="${esc(c.industry)}"></label><label class="f">Accounting system<input id="cf-sys" placeholder="e.g. Tally, Zoho Books, SAP" value="${esc(c.system)}"></label><label class="f">GSTIN<input id="cf-gstin" placeholder="e.g. 33AAACK1234F1Z5" value="${esc(c.gstin||'')}"></label></div></fieldset>
    <fieldset><legend>Classification</legend><div class="form"><label class="f">Entity type<select id="cf-type">${opts(ENT,c.type||'private')}</select></label><label class="f">Group position<select id="cf-rel">${opts(REL,c.rel||'none')}</select></label><label class="f">Nature of business<select id="cf-biz">${opts(BIZ,c.biz||'trading')}</select></label><label class="f">Regulated by<select id="cf-reg">${opts(REG,c.reg||'none')}</select></label><label class="f wide">Cost records sector<select id="cf-cost">${opts(COST,c.cost||'none')}</select></label></div></fieldset>
    <fieldset><legend>Last financial year (₹ crore)</legend><div class="form">${numIn('cf-to','Turnover / gross receipts',c.turnover)}${numIn('cf-pu','Paid-up capital',c.paidup)}${numIn('cf-nw','Net worth',c.networth,'Capital + reserves')}${numIn('cf-np','Net profit before tax',c.profit)}${numIn('cf-bo','Peak bank / FI borrowings',c.borrow)}${numIn('cf-de','Deposits outstanding',c.deposits)}${numIn('cf-pt','Turnover under cost records',c.costTurnover,'Only for a cost-records sector')}${numIn('cf-ct','LLP contribution (₹ lakh)',c.contribution,'Only for LLPs')}${numIn('cf-em','Employees',c.employees)}</div></fieldset>
    <fieldset><legend>Other facts</legend><label class="cb"><input type="checkbox" id="cf-gst" ${c.gst!==false?'checked':''}>GST registered</label><label class="cb"><input type="checkbox" id="cf-cash" ${c.cash5?'checked':''}>Cash receipts and payments each within 5% of totals</label><label class="cb"><input type="checkbox" id="cf-intl" ${c.intl?'checked':''}>International transactions with group companies</label></fieldset>
@@ -114,7 +114,7 @@ function vClientForm(c){
   <div><div class="panel sticky" id="livePreview"></div></div></div>`;
 }
 function formClient(){
-  return{name:val('cf-name'),type:val('cf-type'),rel:val('cf-rel'),biz:val('cf-biz'),reg:val('cf-reg'),cost:val('cf-cost'),industry:val('cf-ind'),system:val('cf-sys'),turnover:+val('cf-to')||0,paidup:+val('cf-pu')||0,networth:+val('cf-nw')||0,profit:+val('cf-np')||0,borrow:+val('cf-bo')||0,deposits:+val('cf-de')||0,costTurnover:+val('cf-pt')||0,contribution:+val('cf-ct')||0,employees:+val('cf-em')||0,gst:!!$('#cf-gst')?.checked,cash5:!!$('#cf-cash')?.checked,intl:!!$('#cf-intl')?.checked};
+  return{name:val('cf-name'),type:val('cf-type'),rel:val('cf-rel'),biz:val('cf-biz'),reg:val('cf-reg'),cost:val('cf-cost'),industry:val('cf-ind'),system:val('cf-sys'),gstin:val('cf-gstin').toUpperCase(),turnover:+val('cf-to')||0,paidup:+val('cf-pu')||0,networth:+val('cf-nw')||0,profit:+val('cf-np')||0,borrow:+val('cf-bo')||0,deposits:+val('cf-de')||0,costTurnover:+val('cf-pt')||0,contribution:+val('cf-ct')||0,employees:+val('cf-em')||0,gst:!!$('#cf-gst')?.checked,cash5:!!$('#cf-cash')?.checked,intl:!!$('#cf-intl')?.checked};
 }
 function livePreview(){
   const p=$('#livePreview');if(!p)return;const c=formClient(),L=applicability(c),y=L.filter(a=>a.st==='yes'),ch=L.filter(a=>a.st==='check'),risks=suggestedRisks(c);
@@ -130,8 +130,8 @@ function vClient(){
   const L=applicability(c),y=L.filter(a=>a.st==='yes').length,ch=L.filter(a=>a.st==='check').length,R=c.roadmap,its=R?.items||[],dn=its.filter(i=>rmStatus(i,R.fy)==='done').length;
   const au=S.audits.filter(a=>a.clientId===c.id),ob=S.observations.filter(o=>o.clientId===c.id),op=ob.filter(o=>o.status!=='Closed'),ev=S.evidence.filter(e=>e.clientId===c.id);
   setTop([['Clients','clients'],[c.name]],`<a class="btn ghost" href="#edit-${c.id}">${ic('edit')}Edit master</a><button class="btn" data-act="tab" data-tab="audits" data-new="1">${ic('plus')}New audit</button>`);
-  const tabs=[['overview','Overview'],['roadmap','Roadmap',its.length],['audits','Audits',au.length],['observations','Findings',op.length],['evidence','Evidence',ev.length]];
-  const body={overview:()=>clientOverview(c,L),roadmap:()=>roadmapBoard(c),audits:()=>clientAudits(c,au),observations:()=>obsTable(ob,{client:c}),evidence:()=>evidenceList(ev,{showAudit:true})}[ui.ctab]||(()=>clientOverview(c,L));
+  const vd=S.vouching.find(v=>v.clientId===c.id&&v.fy===fyNow());const tabs=[['overview','Overview'],['roadmap','Roadmap',its.length],['vouching','Vouching',vd?Object.keys(vd.types||{}).length:''],['audits','Audits',au.length],['observations','Findings',op.length],['evidence','Evidence',ev.length]];
+  const body={overview:()=>clientOverview(c,L),roadmap:()=>roadmapBoard(c),vouching:()=>vouchingTab(c),audits:()=>clientAudits(c,au),observations:()=>obsTable(ob,{client:c}),evidence:()=>evidenceList(ev,{showAudit:true})}[ui.ctab]||(()=>clientOverview(c,L));
   return `<div class="head"><div class="titles"><h1>${esc(c.name)}</h1><div class="chips"><span class="chip">${esc(ENT[c.type]||'')}</span>${isSmall(c)?'<span class="chip">Small company</span>':''}<span class="chip">${esc(BIZ[c.biz]||'')}</span>${c.reg&&c.reg!=='none'?`<span class="chip">${esc(REG[c.reg])}</span>`:''}${c.system?`<span class="chip">Books in ${esc(c.system)}</span>`:''}<span class="chip">Turnover ₹${esc(c.turnover||0)} cr</span></div></div></div>
   <div class="kpis"><div class="kpi"><b>${y}</b><span>Requirements apply${ch?` (+${ch} to check)`:''}</span></div><div class="kpi ${its.length&&dn===its.length?'good':''}"><b>${its.length?pct(dn,its.length)+'%':'—'}</b><span>Roadmap covered</span></div><div class="kpi"><b>${au.filter(a=>!['Reported','Closed'].includes(a.stage)).length}</b><span>Audits in progress</span></div><div class="kpi ${op.some(o=>o.rating==='H')?'alert':''}"><b>${op.length}</b><span>Open findings</span></div><div class="kpi"><b>${ev.length}</b><span>Evidence files</span></div></div>
   <div class="tabs" role="tablist">${tabs.map(([k,l,n])=>`<button role="tab" aria-selected="${ui.ctab===k}" class="${ui.ctab===k?'on':''}" data-act="tab" data-tab="${k}">${l}${n?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>${body()}`;
@@ -303,6 +303,7 @@ function reportBody(a){
   <h2>Annexure A — Evidence index</h2>${ev.length?`<table><thead><tr><th>Ref</th><th>File</th><th>Linked to</th><th>Size</th><th>Added</th><th>SHA-256</th></tr></thead><tbody>${ev.map(e=>`<tr><td><b>${eref(a,e.id)}</b></td>${td(e.name)}${td(e.item!=null&&a.items[e.item]?'Check '+(e.item+1):e.purpose||'Audit file')}${td(fsize(e.size))}<td>${esc(who(e.uploadedBy))}<br>${fmtD((e.uploadedAt||'').slice(0,10))}</td><td style="font-family:Consolas,monospace;font-size:11px;word-break:break-all">${esc(e.sha256||'')}</td></tr>`).join('')}</tbody></table>`:'<p>No evidence files attached.</p>'}
   ${ev.some(e=>e.summary)?`<h2>Annexure B — Spreadsheet evidence</h2>${ev.filter(e=>e.summary).map(e=>`<h3>${eref(a,e.id)} · ${esc(e.name)}</h3><table><thead><tr><th>Sheet</th><th>Rows</th><th>Columns</th><th>Headers</th></tr></thead><tbody>${e.summary.map(s=>`<tr>${td(s.name)}${td(s.rows)}${td(s.cols)}${td(s.header.filter(Boolean).join(', '))}</tr>`).join('')}</tbody></table>`).join('')}`:''}
   ${a.tests?`<h2>Annexure C — Data tests</h2><p>${esc(a.tests.file)}${a.tests.evidenceId?' ('+eref(a,a.tests.evidenceId)+')':''}, ${a.tests.rows} rows, tested ${fmtD(a.tests.at)}.</p><table><thead><tr><th>Test</th><th>Items found</th><th>Why it matters</th></tr></thead><tbody>${a.tests.res.map(r=>`<tr>${td(r.name)}${td(r.total)}${td(r.why)}</tr>`).join('')}</tbody></table>`:''}
+  ${vouchReport(a)}
   <p style="margin-top:26px">Prepared by: <b>${esc(who(a.prepBy))}</b>${a.prepAt?' ('+fmtD(a.prepAt)+')':''} &nbsp;·&nbsp; Reviewed by: <b>${esc(who(a.revBy))}</b>${a.revAt?' ('+fmtD(a.revAt)+')':''}</p>`;
 }
 function reportDoc(a){return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(a.title)+' - internal audit report</title><style>body{font:14px/1.5 Calibri,Arial,sans-serif;max-width:920px;margin:30px auto;padding:0 20px;color:#141a33}table{border-collapse:collapse;width:100%;margin:8px 0}th,td{border:1px solid #ccd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f3f4f9}h1{font-size:26px}h2{font-size:17px;margin-top:26px;border-bottom:2px solid #141a33;padding-bottom:4px}h3{font-size:15px}</style></head><body>'+reportBody(a)+'</body></html>'}
@@ -345,7 +346,7 @@ const ACT={
   signup:t=>{const email=val('lg-email'),password=$('#lg-pass').value;if(!email||password.length<8)return toast('Enter an email and a password of 8+ characters');t.disabled=true;sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}).then(({data,error})=>{t.disabled=false;if(error)return toast(error.message);if(!data.session)toast('Check your email and click the confirmation link, then sign in.')})},
   loadSample:t=>{t.disabled=true;loadSample()},
   clearSample:()=>{if(ui.armed!=='sample'){ui.armed='sample';return render()}ui.armed=null;for(const col of Object.keys(S))for(const x of S[col].filter(y=>y.sample))del(col,x.id);toast('Sample data deleted')},
-  delClient:()=>{if(ui.armed!=='client'){ui.armed='client';return render()}const c=C();S.audits.filter(a=>a.clientId===c.id).forEach(a=>del('audits',a.id));S.observations.filter(o=>o.clientId===c.id).forEach(o=>del('observations',o.id));S.evidence.filter(e=>e.clientId===c.id).forEach(removeEvidence);del('clients',c.id);go('clients')},
+  delClient:()=>{if(ui.armed!=='client'){ui.armed='client';return render()}const c=C();S.audits.filter(a=>a.clientId===c.id).forEach(a=>del('audits',a.id));S.observations.filter(o=>o.clientId===c.id).forEach(o=>del('observations',o.id));S.evidence.filter(e=>e.clientId===c.id).forEach(removeEvidence);S.vouching.filter(v=>v.clientId===c.id).forEach(v=>del('vouching',v.id));del('clients',c.id);go('clients')},
   rebuildPlan:()=>{if(ui.armed!=='rebuild'){ui.armed='rebuild';return render()}ui.armed=null;const c=C();put('clients',c.id,{...c,risks:suggestedRisks(c)})},
   newAudit:t=>{const c=C();newAudit(c.id,t.dataset.t,'','')},
   addAudit:()=>{ui.adding='audit';render()},
@@ -396,6 +397,8 @@ async function handleFiles(kind,files,i){
   const a=A(),c=C();if(!files||!files.length)return;
   if(kind==='audit')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,purpose:'Audit file'});
   if(kind==='item')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,item:+i,purpose:'Check '+(+i+1)});
+  if(kind==='vouch')return importVouchers(c,files[0]);
+  if(kind==='vev'){const {d,type,t:T}=curV(),ix=+i,x=T.sample[ix];const ids=await uploadFiles(files,{clientId:c.id,purpose:`Vouching: ${VSHORT[type]} ${x.vno||''}`});const cur=S.vouching.find(v=>v.id===d.id)||d,ct=cur.types[type];return saveT(cur,type,{...ct,sample:ct.sample.map((y,k)=>k===ix?{...y,ev:[...(y.ev||[]),...ids]}:y)})}
   if(kind==='roadmap'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no rows under the header.');const items=parseRoadmap(rows),R=c.roadmap||{fy:fyNow(),items:[]};await saveRoadmap(c,{...R,items:[...R.items,...items],uploadedAt:today(),uploadFile:f.name});toast(items.length+' roadmap items added from '+f.name)}catch(er){toast(er.message)}return}
   if(kind==='ledger'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no data rows.');const T=runTests(rows,f.name);let evId='';try{evId=(await uploadFiles([f],{clientId:a.clientId,auditId:a.id,purpose:'Ledger used for data tests'}))[0]||''}catch(er){}const cur=S.audits.find(x=>x.id===a.id)||a;await put('audits',a.id,{...cur,tests:{...T,evidenceId:evId},stage:cur.stage==='Planned'?'Fieldwork':cur.stage});toast(T.rows+' rows tested')}catch(er){toast(er.message)}}
 }
@@ -421,8 +424,8 @@ document.addEventListener('submit',e=>{
     toast('Finding saved');if(auditId){ui.atab='observations';ui.lastId=auditId;return go('audit-'+auditId)}return go('observations')}
 });
 
-/* ---------- boot ---------- */
-route();
+/* ---------- boot (after every script has loaded) ---------- */
+document.addEventListener('DOMContentLoaded',()=>{route();
 (async()=>{
   if(window.claude?.use){
     try{db=await window.claude.use('db')}catch(e){db=null}
@@ -443,3 +446,4 @@ route();
   }
   render();
 })();
+});
