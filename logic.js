@@ -214,7 +214,7 @@ function uncovered(c){
 }
 function areaFromText(s){
   s=String(s||'').toLowerCase();
-  const M=[['rbia',/loan|credit|npa|rbia|kyc|lending|advances to customers/],['broker',/broker|depositor|\bdp\b|margin|demat/],['p2p',/purchase|procure|vendor|supplier|p2p|payable/],['o2c',/sales|revenue|receivable|debtor|customer|o2c|billing/],['payroll',/payroll|salary|wage|hr\b|employee/],['fa',/fixed asset|capex|ppe|asset/],['inv',/inventory|stock|stores|warehouse|cost record/],['cash',/cash|bank|treasury|fund/],['itgc',/\bit\b|system|access|erp|itgc|cyber|software|audit trail/],['gov',/governance|board|related part|csr|secretarial|compliance with companies act/],['stat',/gst|tds|tax|statutory|compliance|pf\b|esi|labour|roc/]];
+  const M=[['p2p',/purchase|procure|vendor|supplier|p2p|payable/],['o2c',/sales|revenue|receivable|debtor|customer|o2c|billing|credit limit/],['rbia',/loan|credit appraisal|npa|rbia|kyc|lending|disburs|advances to customers/],['broker',/broker|depositor|\bdp\b|margin|demat/],['payroll',/payroll|salary|wage|hr\b|employee/],['fa',/fixed asset|capex|ppe|asset/],['inv',/inventory|stock|stores|warehouse|cost record/],['cash',/cash|bank|treasury|fund/],['itgc',/\bit\b|system|access|erp|itgc|cyber|software|audit trail/],['gov',/governance|board|related part|csr|secretarial|compliance with companies act/],['stat',/gst|tds|tax|statutory|compliance|pf\b|esi|labour|roc/]];
   for(const [k,re] of M)if(re.test(s))return k;return 'custom';
 }
 function qFromText(s){
