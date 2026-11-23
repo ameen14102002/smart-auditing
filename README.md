@@ -8,6 +8,18 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
 
 **Client master → what applies → roadmap → audit → evidence → findings → report**
 
+**Audit types by area.** Finance & accounts (Finance & accounts; Cash & bank), Business cycles (Sales & receivables; Purchase & payables; Production & operations), Assets & inventory (Inventory & stores; Fixed assets), People (HR & payroll), Tax & compliance (Statutory compliance), Governance, IT & risk (Governance & related parties; IT audit) and Sector-specific (Lending / RBIA; Broker / DP). Each shows what it covers and its procedures (Audits → Audit types). Each client's **Audit plan** tab lists the audits that apply, why, how often, and the audits started.
+
+**Audit programme in every audit.** Vouching and the GST reconciliations are mandatory; each audit type adds its own procedures; TDS vs books is optional. A procedure that does not apply can be marked N/A with a reason (not vouching or GST). The audit cannot be Reported until the programme is done. Procedures and their standard references:
+- **Bank reconciliation (BRS)** (Cash & bank): bank statement vs bank book, matched by amount, cheque / ref and date; cheques not presented (stale over 3 months), deposits not credited, bank-only entries, items cleared in the next statement; the BRS in the standard format.
+- **Physical cash verification** (Cash & bank): count by denomination, IOUs, cash book balance, certificate in the report.
+- **Debtors / Creditors (CRS)** (Sales / Purchase): balances, FIFO ageing, statement-of-account reconciliation, balance confirmation letters (selected by materiality), MSME dues over 45 days.
+- **Physical stock verification** (Inventory) and **fixed assets physical verification** (Fixed assets): key items plus a seeded random sample; shortages, excess, condition; assets not found / not in use / not tagged.
+- **Statutory compliance (due dates)** (Statutory compliance; HR & payroll): GST, TDS / TCS, PF, ESI, advance tax, annual returns and company filings from the client master; TDS deposit dates filled from the challans.
+- **Analytical review** (Finance & accounts): month-wise sales, purchases and GST with unusual months flagged for explanation.
+
+**Import the books once.** The Programme tab takes one Tally Day Book: it feeds vouching, GST & TDS, the bank ledgers (BRS), the debtors and creditors and the analytical review. Annexure F of the report holds the programme and each procedure's result.
+
 1. **Client master.** Enter the entity type, group position, nature of business, regulator, cost-records sector and last year's figures. As you type, the app shows which audits, laws and returns apply, each with its reason and legal basis:
    - **Company law:** internal audit (s.138), CARO 2020, internal financial controls reporting, secretarial audit, Audit Committee, vigil mechanism, CSR, Ind AS, cost records and cost audit, audit trail.
    - **Other entities:** LLP audit, and audit under trust or society law.

@@ -177,7 +177,9 @@ const rule13=c=>{const a=applicability(c).find(x=>x.name==='Internal audit');ret
 function suggestedRisks(c){
   const A=applicability(c).filter(x=>x.st!=='no'),cnt={};
   for(const a of A)for(const k of a.areas)cnt[k]=(cnt[k]||0)+1;
-  for(const k of ['p2p','o2c','cash','stat'])cnt[k]=cnt[k]||1;
+  for(const k of ['fin','p2p','o2c','cash','stat'])cnt[k]=cnt[k]||1;
+  if(['private','opc','public','listed','sec8','llp'].includes(c.type))cnt.fa=cnt.fa||1;
+  if(c.biz==='manufacturing')cnt.prod=cnt.prod||1;
   if(c.biz==='manufacturing'||c.biz==='trading')cnt.inv=(cnt.inv||0)+1;
   if(+c.employees>0)cnt.payroll=cnt.payroll||1;
   return Object.keys(TEMPLATES).filter(k=>cnt[k]).map(k=>({t:k,i:cnt[k]>=3?5:cnt[k]>=2?4:3,c:3}));
