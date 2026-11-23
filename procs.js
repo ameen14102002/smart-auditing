@@ -11,6 +11,9 @@ IC.prog='<path d="M9 5h11M9 12h11M9 19h11"/><path d="M4 5l1 1 2-2M4 12l1 1 2-2M4
 const CATS=[['fin','Finance & accounts'],['cycle','Business cycles'],['assets','Assets & inventory'],['people','People (HR)'],['comp','Tax & compliance'],['gov','Governance, IT & risk'],['sector','Sector-specific']];
 TEMPLATES.fin={name:'Finance & accounts',items:[['Books closed monthly; trial balance reviewed and suspense / clearing accounts nil','SIA 320'],['Journal entries authorised, with supporting documents; manual and period-end entries reviewed','SIA 11 · data test'],['Opening balances agree with last year\'s audited figures','SIA 320'],['Provisions and accruals (expenses, bonus, gratuity, leave) made for the period','SIA 320'],['Advances to staff, suppliers and others reviewed and adjusted','SIA 320'],['Month-wise trends of sales, purchases and expenses reviewed and variances explained','SIA 6 analytical review'],['Inter-branch / inter-company accounts reconciled','SIA 320']]};
 TEMPLATES.prod={name:'Production & operations',items:[['Production planned against orders; plan vs actual reviewed','SIA 310'],['Raw material issued only against approved requisitions','SIA 120'],['Consumption per unit compared with standard; variances explained','SIA 6'],['Wastage, scrap and rejections recorded, approved and disposed of properly','SIA 320'],['Job-work goods sent and received reconciled (challans, ITC-04)','GST compliance'],['Machine maintenance as per schedule; breakdowns recorded','Operational'],['Quality checks done before dispatch','Operational']]};
+/* vouching and GST & TDS are topics of their own, mandatory every cycle (owner, 23 Nov 2026) */
+TEMPLATES.vouch={name:'Vouching (transaction audit)',items:[['Import the period\'s books and draw the sample by the standard method (key items, value-weighted sample, risk picks)','SIA 5 sampling'],['For each sampled purchase / expense: check the bill is in the entity\'s name, GSTIN and tax correct, goods / service received (GRN), approved, and posted to the right ledger and period','SIA 320'],['For each sampled sale: check the invoice, dispatch proof, rate as per price list, GST and place of supply, and posting','SIA 320'],['For each sampled payment / receipt: check the approval, payee or payer, bank entry, and TDS / cash-limit compliance','SIA 320 · cash payment limits'],['For each sampled journal: check the reason, supporting working and approval','SIA 11'],['Record exceptions, project the misstatement and compare it with the tolerable error','SIA 5'],['Report exceptions as findings with the voucher references','SIA 370']]};
+TEMPLATES.gsttds={name:'GST & TDS compliance',items:[['Reconcile GSTR-1 with the sales books, month by month and invoice by invoice','CGST Act s.37'],['Reconcile GSTR-2B with the purchase books; list ITC on bills not in 2B','CGST Act s.16(2)(aa)'],['Agree GSTR-3B output tax with GSTR-1','CGST Act s.39 · Rule 88C'],['Agree GSTR-3B ITC with GSTR-2B; reverse excess ITC','Rule 88D'],['Check blocked credits, reverse charge and ITC reversals','CGST Act s.17(5), s.9(3)'],['Agree TDS deducted in the books with challans; check deposit dates and interest','Income-tax'],['Check TDS / TCS returns filed on time and certificates issued','Income-tax']]};
 Object.assign(TEMPLATES.p2p,{name:'Purchase & payables (procure to pay)'});
 Object.assign(TEMPLATES.o2c,{name:'Sales & receivables (order to cash)'});
 Object.assign(TEMPLATES.cash,{name:'Cash & bank (treasury)'});
@@ -19,6 +22,8 @@ Object.assign(TEMPLATES.payroll,{name:'HR & payroll',items:[...TEMPLATES.payroll
 Object.assign(TEMPLATES.itgc,{name:'IT audit (general controls)'});
 Object.assign(TEMPLATES.gov,{name:'Governance & related parties'});
 const UNI={
+  vouch:{cat:'fin',must:true,covers:['Purchases and expenses','Sales','Payments and receipts','Journals','Supporting documents and approvals','Projection of errors'],procs:['vouch']},
+  gsttds:{cat:'comp',must:true,covers:['GSTR-1 vs sales','GSTR-2B vs purchases','GSTR-3B vs GSTR-1','GSTR-3B vs GSTR-2B','ITC eligibility','TDS deducted vs deposited','TDS returns'],procs:['gst','tds']},
   fin:{cat:'fin',covers:['Books closing and trial balance','Journal entries','Provisions and accruals','Advances','Month-wise trends'],procs:['ar','tests']},
   cash:{cat:'fin',covers:['Bank reconciliation (BRS)','Cash in hand count','Cash payment limits','Bank charges, interest, FDs','Cheque book custody'],procs:['brs','cash']},
   o2c:{cat:'cycle',covers:['Customer master and credit limits','Pricing and discounts','Dispatch vs invoice','Credit notes','Debtors reconciliation and confirmation','Ageing and bad debts','Output GST'],procs:['drs']},
@@ -33,6 +38,7 @@ const UNI={
   rbia:{cat:'sector',covers:['Credit appraisal and sanction','Disbursement','Asset classification and provisioning','KYC / AML','RBI returns'],procs:[]},
   broker:{cat:'sector',covers:['Client funds and securities','KYC','Margins','Exchange / depository reports'],procs:[]}};
 const PR={
+  chk:{n:'Audit procedures (checklist)',ref:'SIA 320 · SIA 330',why:'Each audit step tested, with a result, notes and evidence.'},
   vouch:{n:'Vouching',ref:'SIA 320 · SIA 5',must:true,why:'Every sampled voucher checked to its bill, approval and payment.'},
   gst:{n:'GST reconciliations',ref:'SIA 150 · CGST Act',must:true,why:'GSTR-1, 2B and 3B agreed with the books, month by month.'},
   tds:{n:'TDS vs books',ref:'Income-tax',opt:true,why:'TDS deducted in the books deposited on time (only where the client deducts TDS).'},
@@ -46,10 +52,10 @@ const PR={
   ar:{n:'Analytical review',ref:'SIA 6',why:'Month-wise trends compared; unusual months explained.'},
   tests:{n:'Ledger data tests',ref:'SIA 6 · SIA 11',why:'Duplicates, round sums, Sunday and large cash entries in a ledger.'}};
 const POPT=k=>!!PR[k].opt;
-function programmeOf(a){const L=['vouch','gst',...(UNI[a.t]?.procs||[]),'tds'];return L.filter((k,i)=>L.indexOf(k)===i)}
+function programmeOf(a){const L=['chk',...(UNI[a.t]?.procs||[])];return L.filter((k,i)=>L.indexOf(k)===i)}
 function planFor(c){const R=(c.risks&&c.risks.length?c.risks:suggestedRisks(c)),A=applicability(c).filter(x=>x.st!=='no'),why={};
   for(const x of A)for(const k of x.areas||[])(why[k]=why[k]||[]).push(x.name);
-  return Object.keys(TEMPLATES).map(t=>{const r=R.find(x=>x.t===t);return{t,on:!!r,r,why:why[t]||[]}})}
+  return Object.keys(TEMPLATES).filter(t=>UNI[t]).map(t=>{const r=R.find(x=>x.t===t),must=!!UNI[t].must;return{t,on:must||!!r,must,r:r||(must?{t,i:5,c:3}:null),why:must?['Mandatory every month']:why[t]||[]}})}
 
 /* ---------- one record per client and financial year ---------- */
 const pdocId=(c,fy)=>c.id+'-'+String(fy).replace(/[^0-9]/g,'');
@@ -357,10 +363,11 @@ function concBox(d,k){const x=d.conc?.[k]||{};return `<div class="panel" style="
 
 /* ---------- the programme: status of each procedure ---------- */
 function pStatus(k,c,a){
-  const d=pOpen(c),cc=d.conc?.[k]?.st;if(a&&a.na?.[k]&&!PR[k].must)return{st:'na',text:'Not applicable: '+a.na[k]};
+  const d=pOpen(c),cc=d.conc?.[k]?.st;if(a&&a.na?.[k]&&k!=='chk'&&!UNI[a.t]?.must)return{st:'na',text:'Not applicable: '+a.na[k]};
   const m=typeof mandatory==='function'?mandatory(c):null;
   if(k==='vouch')return m?{st:m.vouch.st,text:m.vouch.text}:{st:'todo',text:''};
   if(k==='gst')return m?{st:m.gst.st,text:m.gst.text}:{st:'todo',text:''};
+  if(k==='chk'){if(!a)return{st:'todo',text:''};const n=a.items.length,t=a.items.filter(i=>i.r).length,ex=a.items.filter(i=>i.r==='ex').length;return{st:n&&t===n?'done':t?'doing':'todo',text:`${t} of ${n} steps tested`+(ex?` · ${ex} exception${ex===1?'':'s'}`:'')}}
   if(k==='tds'){const t=m?.tds;return{st:rdoc(c)?.notes?.r5?.conc?'done':'opt',text:t?.text||''}}
   if(k==='tests'){const t=a?.tests;return t?{st:'done',text:t.res.filter(r=>r.total).length+' tests with hits on '+esc(t.file||'the ledger')}:{st:'todo',text:'Upload a ledger to test'}}
   if(k==='brs'){const L=d.brs.accts;if(!L.length)return{st:'todo',text:'No bank account yet'};const R=L.map(ac=>brsCalc(ac,d)),ok=R.filter(r=>r.diff!=null&&Math.abs(r.diff)<=1).length;
@@ -381,28 +388,30 @@ function programmeTab(a,c){
   const P=progStatus(a,c),d=pOpen(c),u=UNI[a.t];
   return `<div class="grid2 even" style="margin-bottom:14px"><label class="drop" data-drop="books">${ic('up')}<b>Import the books once: Tally Day Book XML</b><span class="small">${d.led?'Last: '+esc(d.led.file)+' · '+fmtD(d.led.from)+' to '+fmtD(d.led.to):'One file feeds vouching, GST & TDS, bank reconciliation, debtors, creditors and the analytical review. CSV / Excel registers work per procedure too.'}</span><input type="file" data-file="books" accept=".xml,.csv,.xlsx,.xls" hidden></label>
    <div class="panel"><h3>${esc(TEMPLATES[a.t]?.name||a.title)}${u?` <span class="tag n">${esc(CATS.find(x=>x[0]===u.cat)?.[1]||'')}</span>`:''}</h3>${u?`<p class="small" style="margin:0 0 6px">Covers: ${u.covers.map(esc).join(' · ')}</p>`:''}<p class="small muted" style="margin:0">${P.dn.length} of ${P.need.length} required procedures done${P.done?' · <b style="color:var(--ok)">ready to report</b>':' · needed before the audit is reported'}.</p></div></div>
-   <div class="scroll"><table class="stack"><thead><tr><th>#</th><th>Procedure</th><th>Standard / law</th><th>Status</th><th>Result</th><th></th></tr></thead><tbody>${P.L.map((x,i)=>`<tr><td>${i+1}</td><td><a href="#" data-act="ptab" data-v="${x.k}"><b>${esc(PR[x.k].n)}</b></a>${PR[x.k].must?' <span class="tag n">Mandatory</span>':POPT(x.k)?' <span class="tag n">Optional</span>':''}<div class="small muted">${esc(PR[x.k].why)}</div>
+   <div class="scroll"><table class="stack"><thead><tr><th>#</th><th>Procedure</th><th>Standard / law</th><th>Status</th><th>Result</th><th></th></tr></thead><tbody>${P.L.map((x,i)=>`<tr><td>${i+1}</td><td><a href="#" data-act="ptab" data-v="${x.k}"><b>${esc(PR[x.k].n)}</b></a>${POPT(x.k)?' <span class="tag n">Optional</span>':''}<div class="small muted">${esc(PR[x.k].why)}</div>
      ${ui.naEdit===x.k?`<form class="row small" data-naform="${x.k}" style="gap:6px;margin-top:4px"><input name="r" placeholder="Why it does not apply" required style="flex:1"><button class="btn sm" type="submit">Save</button><button class="btn ghost sm" type="button" data-act="naCancel">Cancel</button></form>`:''}</td><td class="small">${esc(PR[x.k].ref)}</td><td><span class="tag ${PTAG[x.st][0]}">${PTAG[x.st][1]}</span></td><td class="small">${x.text}</td>
-     <td style="white-space:nowrap"><button class="btn ghost sm" data-act="ptab" data-v="${x.k}">Open</button>${PR[x.k].must||POPT(x.k)?'':x.st==='na'?`<button class="btn ghost sm" data-act="naUndo" data-v="${x.k}">Applies</button>`:`<button class="btn ghost sm" data-act="naEdit" data-v="${x.k}">N/A</button>`}</td></tr>`).join('')}</tbody></table></div>
+     <td style="white-space:nowrap"><button class="btn ghost sm" data-act="ptab" data-v="${x.k}">Open</button>${x.k==='chk'||UNI[a.t]?.must||POPT(x.k)?'':x.st==='na'?`<button class="btn ghost sm" data-act="naUndo" data-v="${x.k}">Applies</button>`:`<button class="btn ghost sm" data-act="naEdit" data-v="${x.k}">N/A</button>`}</td></tr>`).join('')}</tbody></table></div>
    <p class="small muted" style="margin-top:8px">Other procedures can be added from the Procedures tab whenever needed. The data of each procedure is kept per client and financial year, so the client's other audits of the year use the same work.</p>`}
-const PK=['vouch','gst','tds','brs','cash','drs','crs','stock','fav','comp','ar','tests'];
+const PK=['chk','vouch','gst','tds','brs','cash','drs','crs','stock','fav','comp','ar','tests'];
 function procTab(a,c){
   const prog=programmeOf(a),cur=PK.includes(ui.ptab)?ui.ptab:prog[0],d=pOpen(c),more=PK.filter(k=>!prog.includes(k));
   const pill=(k,dim)=>{const s=pStatus(k,c,a);return `<button class="chip" data-act="ptab" data-v="${k}" style="${cur===k?'border-color:var(--acc);color:var(--acc-ink);font-weight:700;':''}${dim?'opacity:.75':''}"><span style="color:var(--${s.st==='done'?'ok':s.st==='todo'?'hi':'muted'})">●</span> ${esc(PR[k].n)}</button>`};
-  const body={vouch:()=>vouchingTab(c),gst:()=>{if(ui.rtab==='r5')ui.rtab='data';return reconTab(c)},tds:()=>{ui.rtab=ui.rtab==='data'?'data':'r5';return reconTab(c)},brs:()=>brsTab(c,d),cash:()=>cashTab(c,d),drs:()=>partyTab(c,d,'dr'),crs:()=>partyTab(c,d,'cr'),stock:()=>stockTab(c,d),fav:()=>favTab(c,d),comp:()=>compTab(c,d),ar:()=>arTab(c,d),tests:()=>testsTab(a)}[cur];
+  const body={chk:()=>{ui.atab='checklist';return checklistTab(a,auditEvidence(a),S.observations.filter(o=>o.auditId===a.id))},vouch:()=>vouchingTab(c),gst:()=>reconTab(c),tds:()=>reconTab(c),brs:()=>brsTab(c,d),cash:()=>cashTab(c,d),drs:()=>partyTab(c,d,'dr'),crs:()=>partyTab(c,d,'cr'),stock:()=>stockTab(c,d),fav:()=>favTab(c,d),comp:()=>compTab(c,d),ar:()=>arTab(c,d),tests:()=>testsTab(a)}[cur];
   return `<div class="row" style="gap:6px;margin-bottom:6px">${prog.map(k=>pill(k)).join('')}</div>${more.length?`<details style="margin-bottom:12px"><summary class="small muted" style="cursor:pointer">More procedures</summary><div class="row" style="gap:6px;margin-top:6px">${more.map(k=>pill(k,1)).join('')}</div></details>`:''}
    <div class="row" style="margin:4px 0 12px"><h2 class="sp" style="margin:0;font-size:18px">${esc(PR[cur].n)}</h2><span class="tag n">${esc(PR[cur].ref)}</span></div><p class="small muted" style="margin:-6px 0 12px">${esc(PR[cur].why)} Kept for ${esc(c.name)}, FY ${esc(fyNow())}.</p>${body()}`}
 
 /* ---------- client: audit plan; all audit types ---------- */
 function planTab(c){
   const P=planFor(c),au=S.audits.filter(a=>a.clientId===c.id);
-  return `<p class="small muted" style="margin:0 0 12px">The audits for ${esc(c.name)}, grouped by area, from the client master and risk register. Every audit includes vouching and the GST reconciliations, plus its own procedures.</p>`+CATS.map(([cat,cl])=>{const L=P.filter(x=>UNI[x.t]?.cat===cat);if(!L.length)return'';
-    return `<h2 class="section">${esc(cl)}</h2><div class="scroll"><table class="stack"><thead><tr><th>Audit</th><th>Covers</th><th>Procedures</th><th>How often</th><th>Audits</th><th></th></tr></thead><tbody>${L.map(x=>{const A=au.filter(a=>a.t===x.t),u=UNI[x.t],lv=x.r?level(x.r.i*x.r.c):'';
-      return `<tr style="${x.on?'':'opacity:.6'}"><td><b>${esc(TEMPLATES[x.t].name)}</b>${x.on?'':'<div class="small muted">Not in this year\'s plan</div>'}${x.why.length?`<div class="small muted">Because of: ${esc(x.why.slice(0,3).join(', '))}</div>`:''}</td><td class="small">${u.covers.map(esc).join(' · ')}</td><td class="small">${['vouch','gst',...u.procs].filter((k,i,a)=>a.indexOf(k)===i).map(k=>esc(PR[k].n)).join(' · ')}</td><td class="small">${x.on?freq(lv):'—'}</td><td class="small">${A.map(a=>`<a href="#audit-${a.id}">${esc(a.period||a.title)}</a> <span class="tag n">${esc(a.stage)}</span>`).join('<br>')||'—'}</td><td><button class="btn ${x.on?'':'ghost '}sm" data-act="newAudit" data-t="${x.t}">${ic('plus')}Start</button></td></tr>`}).join('')}</tbody></table></div>`}).join('')}
+  return `<p class="small muted" style="margin:0 0 12px">The audits for ${esc(c.name)}, grouped by area, from the client master and risk register Internal audit is monthly; vouching and GST &amp; TDS compliance are mandatory every month.</p>`+CATS.map(([cat,cl])=>{const L=P.filter(x=>UNI[x.t]?.cat===cat);if(!L.length)return'';
+    return `<h2 class="section">${esc(cl)}</h2><div class="scroll"><table class="stack"><thead><tr><th>Audit</th><th>Covers</th><th>Audit procedures</th><th>How often</th><th>Audits</th><th></th></tr></thead><tbody>${L.map(x=>{const A=au.filter(a=>a.t===x.t),u=UNI[x.t],lv=x.r?level(x.r.i*x.r.c):'';
+      return `<tr style="${x.on?'':'opacity:.6'}"><td><b>${esc(TEMPLATES[x.t].name)}</b>${x.must?' <span class="tag n">Mandatory</span>':''}${x.on?'':'<div class="small muted">Not in this year\'s plan</div>'}${x.why.length?`<div class="small muted">Because of: ${esc(x.why.slice(0,3).join(', '))}</div>`:''}</td><td class="small">${u.covers.map(esc).join(' · ')}</td><td class="small">${procList(x.t)}</td><td class="small">${x.on?(x.must?'<b>Every month · mandatory</b>':'Every month'):'—'}</td><td class="small">${A.map(a=>`<a href="#audit-${a.id}">${esc(a.period||a.title)}</a> <span class="tag n">${esc(a.stage)}</span>`).join('<br>')||'—'}</td><td><button class="btn ${x.on?'':'ghost '}sm" data-act="newAudit" data-t="${x.t}">${ic('plus')}Start</button></td></tr>`}).join('')}</tbody></table></div>`}).join('')}
+function procList(t){const u=UNI[t],tools=(u?.procs||[]).map(k=>PR[k].n);
+  return `<ol class="small" style="margin:0;padding-left:18px">${TEMPLATES[t].items.map(([q,ref])=>`<li>${esc(q)} <span class="muted">(${esc(ref)})</span></li>`).join('')}</ol>${tools.length?`<p class="small" style="margin:4px 0 0"><b>Done with:</b> ${tools.map(esc).join(' · ')}</p>`:''}`}
 function vUniverse(){
   setTop([['Audits','audits'],['Audit types']]);
   return `<div class="head"><div class="titles"><h1>Audit types</h1><p class="sub">Every internal audit in Smart Auditing, by area: what it covers, its procedures and its checklist. The client master decides which apply to a client.</p></div></div>${auditSubnav('universe')}`+CATS.map(([cat,cl])=>{const L=Object.keys(UNI).filter(t=>UNI[t].cat===cat&&TEMPLATES[t]);
-    return `<h2 class="section">${esc(cl)}</h2><div class="grid2 even">${L.map(t=>`<div class="panel"><h3>${esc(TEMPLATES[t].name)}</h3><p class="small" style="margin:0 0 6px"><b>Covers:</b> ${UNI[t].covers.map(esc).join(' · ')}</p><p class="small" style="margin:0 0 6px"><b>Procedures:</b> ${['vouch','gst',...UNI[t].procs].filter((k,i,a)=>a.indexOf(k)===i).map(k=>esc(PR[k].n)).join(' · ')}</p><p class="small muted" style="margin:0">${TEMPLATES[t].items.length} checklist points</p></div>`).join('')}</div>`}).join('')}
+    return `<h2 class="section">${esc(cl)}</h2><div class="grid2 even">${L.map(t=>`<div class="panel"><h3>${esc(TEMPLATES[t].name)}${UNI[t].must?' <span class="tag n">Mandatory every month</span>':''}</h3><p class="small" style="margin:0 0 6px"><b>Covers:</b> ${UNI[t].covers.map(esc).join(' · ')}</p><p class="small" style="margin:0 0 4px"><b>Audit procedures:</b></p>${procList(t)}</div>`).join('')}</div>`}).join('')}
 
 /* ---------- report: Annexure F ---------- */
 function programmeReport(a){
@@ -423,7 +432,7 @@ const Cx=()=>C(),pd=()=>pOpen(Cx());
 const csvOf=rows=>rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
 const curBrs=d=>d.brs.accts.find(a=>a.id===ui.brsA)||d.brs.accts[0];
 Object.assign(ACT,{
-  ptab:t=>{ui.atab='proc';ui.ptab=t.dataset.v;if(t.dataset.v==='tds')ui.rtab='r5';render()},
+  ptab:t=>{ui.atab='proc';ui.ptab=t.dataset.v;if(t.dataset.v==='tds')ui.rtab='r5';else if(t.dataset.v==='gst'&&ui.rtab==='r5')ui.rtab='data';render()},
   naEdit:t=>{ui.naEdit=t.dataset.v;render()},naCancel:()=>{ui.naEdit=null;render()},
   naUndo:t=>{const a=A(),na={...(a.na||{})};delete na[t.dataset.v];put('audits',a.id,{...a,na})},
   brsA:t=>{ui.brsA=t.dataset.v;render()},

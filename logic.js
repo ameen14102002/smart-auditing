@@ -188,20 +188,56 @@ const level=s=>s>=15?'H':s>=8?'M':'L';
 const freq=l=>({H:'Every quarter',M:'Every half-year',L:'Once a year'}[l]);
 
 /* ---------- Audit roadmap: generated from the client master or uploaded ---------- */
-const QTR=[['Q1','Apr–Jun'],['Q2','Jul–Sep'],['Q3','Oct–Dec'],['Q4','Jan–Mar']];
+/* the internal audit is monthly (owner, 23 Nov 2026): the plan's periods are the 12 months of the FY, Apr = 0 … Mar = 11 */
+const QTR=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map(m=>[m,'']);
+const pLabel=(fy,q)=>QTR[q][0]+' '+(+String(fy).slice(0,4)+(q>=9?1:0));
 const fyNow=()=>{const d=new Date(),y=d.getMonth()>=3?d.getFullYear():d.getFullYear()-1;return y+'-'+String((y+1)%100).padStart(2,'0')};
-const qEnd=(fy,q)=>{const y=+String(fy).slice(0,4);return q===3?(y+1)+'-03-31':y+['-06-30','-09-30','-12-31'][q]};
-const curQ=fy=>{const t=today();for(let q=0;q<4;q++)if(t<=qEnd(fy,q))return q;return 4};
+const qEnd=(fy,q)=>{const y=+String(fy).slice(0,4)+(q>=9?1:0),m=(q+3)%12+1,dd=new Date(y,m,0).getDate();return `${y}-${String(m).padStart(2,'0')}-${dd}`};
+const curQ=fy=>{const t=today();for(let q=0;q<12;q++)if(t<=qEnd(fy,q))return q;return 12};
 const GENERIC=[['Understand the process and walk through key controls','SIA 310'],['Test a sample of transactions against policy','SIA 320'],['Check compliance with applicable laws and regulations','SIA 150'],['Agree exceptions with the process owner','SIA 360']];
 const AREA_NAME=k=>TEMPLATES[k]?.name||'Custom area';
 const COMPLIANCE={'Tax audit':['stat','Tax audit readiness: books and audit-report data',[1]],'GSTR-9 annual return':['stat','GST annual return and GSTR-9C reconciliation review',[2]],'CARO 2020 reporting by statutory auditor':['fa','CARO readiness: asset and stock verification',[3]],'Internal financial controls reporting':['itgc','Internal financial controls: walkthroughs and testing',[2]],'Cost records':['inv','Cost records review',[3]],'CSR spending':['gov','CSR spend and unspent-amount review',[3]],'Secretarial audit':['gov','Secretarial compliance check',[1]],'Risk-based internal audit (RBIA)':['rbia','Annual RBIA risk assessment and plan approval',[0]],'Regulatory internal audit':['broker','Half-yearly regulatory internal audit',[1,3]],'Provident fund (EPF)':['payroll','EPF and ESI compliance review',[1]],'Audit trail in accounting software':['itgc','Audit trail (edit log) check',[0]],'Transfer pricing report':['gov','Related party and transfer pricing review',[2]]};
-function genRoadmap(c){
+/* the span of a roadmap: the FY quarter or half-year that contains this month, or the rest of the year (owner, 23 Nov 2026) */
+function spanEnd(fy,span){const cq=Math.min(curQ(fy),11);return span==='quarter'?Math.floor(cq/3)*3+2:span==='half'?(cq<6?5:11):11}
+const SPANS={quarter:'Quarter',half:'Half-year',year:'Year'};
+function genRoadmap(c,span='year'){
   const fy=fyNow(),items=[],seen=new Set(),push=o=>{const k=o.title+'|'+o.q;if(seen.has(k))return;seen.add(k);items.push({id:nid(),source:'auto',done:false,auditId:'',...o})};
-  const cq=Math.min(curQ(fy),3),from=qs=>{const f=qs.filter(q=>q>=cq);return f.length?f:[cq]};
-  for(const r of (c.risks&&c.risks.length?c.risks:suggestedRisks(c))){const s=r.i*r.c,l=level(s),qs=from(l==='H'?[0,1,2,3]:l==='M'?[1,3]:[2]);
-    for(const q of qs)push({area:r.t,title:AREA_NAME(r.t)+(qs.length>1?' · '+QTR[q][0]:''),q,why:`${freq(l)} (risk score ${s})`})}
-  for(const a of applicability(c).filter(x=>x.st!=='no')){const m=COMPLIANCE[a.name];if(m)for(const q of from(m[2]))push({area:m[0],title:m[1],q,why:'Required: '+a.name,req:a.name})}
-  return{fy,items:items.sort((a,b)=>a.q-b.q),generatedAt:today()};
+  /* Yearly plan, split by month, most important first (owner, 23 Nov 2026; SIA 220: one plan for the year, highest risks first).
+     First month: planning, opening balances, a statutory dues health-check and catch-up, then the highest-risk area.
+     Every month: vouching and GST & TDS (mandatory), cash & bank, statutory due dates. Focus areas by risk score: high
+     first and again each quarter, medium twice, low once; at most two a month. Calendar work in its month (half-year, year-end). */
+  const cq=Math.min(curQ(fy),11),end=spanEnd(fy,span),P=(typeof planFor==='function'?planFor(c):[]).filter(x=>x.on),has=t=>P.some(x=>x.t===t),A=applicability(c).filter(x=>x.st!=='no').map(x=>x.name);
+  const add=(q,o)=>{if(q>=cq&&q<=end)push({q,...o})},name=t=>AREA_NAME(t)+' · '+QTR[0][0];
+  add(cq,{area:'custom',custom:'Planning',title:'Engagement planning: scope, team and timelines agreed; business and processes understood',prio:0,kind:'Foremost',why:'SIA 220 / SIA 310: plan before fieldwork'});
+  add(cq,{area:'custom',custom:'Planning',title:'Risk assessment and this year\'s audit plan approved by management',prio:0,kind:'Foremost',why:'Risk register drives the order of work'});
+  add(cq,{area:'fin',title:'Opening balances agreed with last year\'s audited accounts; last year\'s open findings followed up',prio:0,kind:'Foremost',why:'Start from a clean base'});
+  if(has('stat'))add(cq,{area:'stat',title:'Statutory dues health-check: GST, TDS, PF / ESI and filings pending or late',prio:0,kind:'Foremost',why:'Interest and penalties grow every month'});
+  if(cq>0)add(cq,{area:'vouch',title:'Catch-up: vouching and GST reconciliations for Apr – '+QTR[cq-1][0],prio:1,kind:'Foremost',why:'Months before the engagement started'});
+  for(let q=cq;q<=end;q++){
+    add(q,{area:'vouch',title:AREA_NAME('vouch')+' · '+QTR[q][0],prio:1,kind:'Every month',why:'Mandatory every month'});
+    add(q,{area:'gsttds',title:AREA_NAME('gsttds')+' · '+QTR[q][0],prio:1,kind:'Every month',why:'Mandatory every month'});
+    if(has('cash'))add(q,{area:'cash',title:'Cash & bank: BRS and cash count · '+QTR[q][0],prio:2,kind:'Every month',why:'Monthly BRS; surprise cash count'});
+    if(has('stat'))add(q,{area:'stat',title:'Statutory due dates · '+QTR[q][0],prio:2,kind:'Every month',why:'Returns and payments of the month'})}
+  /* focus areas by risk score */
+  const ORD=['stat','p2p','o2c','payroll','inv','fa','fin','itgc','gov','prod','rbia','broker'];
+  const F=P.filter(x=>!['vouch','gsttds','cash'].includes(x.t)).map(x=>({t:x.t,s:x.r?x.r.i*x.r.c:9})).sort((a,b)=>b.s-a.s||ORD.indexOf(a.t)-ORD.indexOf(b.t));
+  /* how many reviews fit in the months left: high risk every quarter, medium every half-year, low once */
+  const left=end-cq+1,load={},slots=[];for(const f of F){const l=level(f.s),n=Math.max(1,Math.min(l==='H'?4:l==='M'?2:1,Math.ceil(left/(l==='H'?3:6)))),gap=Math.max(1,Math.floor(left/n));for(let k=0;k<n;k++)slots.push({...f,l,k,want:cq+k*gap})}
+  slots.sort((a,b)=>a.k-b.k||b.s-a.s);
+  for(const x of slots){let q=Math.max(cq,x.want);while(q<=end&&(load[q]||0)>=2)q++;
+    if(q>end){if(x.k)continue;q=cq;for(let j=cq;j<=end;j++)if((load[j]||0)<(load[q]||0))q=j}load[q]=(load[q]||0)+1;
+    add(q,{area:x.t,title:AREA_NAME(x.t)+' · '+QTR[q][0]+(x.k?' (follow-up '+x.k+')':''),prio:3+(x.l==='H'?0:x.l==='M'?1:2),kind:x.l==='H'?'High risk':x.l==='M'?'Medium risk':'Low risk',why:`Focus area, risk score ${x.s}`+(x.k?'; follow-up review':'')})}
+  /* calendar work */
+  if(A.includes('Tax audit'))add(5,{area:'stat',title:'Tax audit readiness: books and audit-report data for last year',prio:2,kind:'Calendar',why:'Tax audit report due around September'});
+  if(has('o2c')||has('p2p'))add(5,{area:has('o2c')?'o2c':'p2p',title:'Half-year balance confirmations: debtors and creditors',prio:2,kind:'Calendar',why:'Half-year close'});
+  if(has('inv'))add(5,{area:'inv',title:'Half-year physical stock verification (test counts)',prio:2,kind:'Calendar',why:'Half-year close'});
+  if(A.some(n=>/GSTR-9/.test(n))||isGstin(c.gstin))add(8,{area:'gsttds',title:'GST annual return review: GSTR-9 / 9C for last year',prio:2,kind:'Calendar',why:'Due by 31 December'});
+  if(['private','opc','public','listed','sec8'].includes(c.type))add(6,{area:'stat',title:'Company law filings: AOC-4 and MGT-7 after the AGM',prio:2,kind:'Calendar',why:'Due within 30 / 60 days of the AGM'});
+  add(11,{area:has('inv')?'inv':'fin',title:'Year-end: physical verification of stock and fixed assets, cash count on 31 March, cut-off and provisions',prio:1,kind:'Year-end',why:'Year-end close; CARO 3(i) and 3(ii)'});
+  if(has('o2c')||has('p2p'))add(11,{area:has('o2c')?'o2c':'p2p',title:'Year-end balance confirmations: debtors, creditors, banks, loans',prio:1,kind:'Year-end',why:'Balances as on 31 March'});
+  for(const a of A){const m=COMPLIANCE[a];if(m&&!/Tax audit|GSTR-9/.test(a))add(Math.min(end,Math.max(cq,m[2][0]*3+2)),{area:m[0],title:m[1],prio:2,kind:'Calendar',why:'Required: '+a,req:a})}
+  items.sort((a,b)=>a.q-b.q||(a.prio??5)-(b.prio??5));
+  return{fy,unit:'month',span,from:cq,to:end,items,generatedAt:today()};
 }
 function rmStatus(it,fy){
   const a=it.auditId&&S.audits.find(x=>x.id===it.auditId);
@@ -221,11 +257,11 @@ function areaFromText(s){
 }
 function qFromText(s){
   s=String(s||'').trim().toLowerCase();let m;
-  if(m=s.match(/q\s*([1-4])/))return +m[1]-1;
-  if(/h1|first half/.test(s))return 1;if(/h2|second half|annual|year/.test(s))return 3;
+  if(m=s.match(/q\s*([1-4])/))return (+m[1]-1)*3;
+  if(/h1|first half/.test(s))return 5;if(/h2|second half|annual|year/.test(s))return 11;
   const mon='janfebmaraprmayjunjulaugsepoctnovdec';
-  const d=toDate(s);if(d&&!isNaN(d))return [3,3,3,0,0,0,1,1,1,2,2,2][d.getMonth()];
-  for(let i=0;i<12;i++)if(s.includes(mon.slice(i*3,i*3+3)))return [3,3,3,0,0,0,1,1,1,2,2,2][i];
+  for(let i=0;i<12;i++)if(s.includes(mon.slice(i*3,i*3+3)))return (i+9)%12;
+  const d=toDate(s);if(d&&!isNaN(d))return (d.getMonth()+9)%12;
   return null;
 }
 async function readSheet(f){
@@ -243,7 +279,7 @@ function parseRoadmap(rows){
   const cq=curQ(fyNow());
   return rows.slice(1).map(r=>{const title=String(r[ci.title>=0?ci.title:ci.area]||'').trim(),areaTxt=ci.area>=0?r[ci.area]:title;if(!title)return null;
     const area=areaFromText(areaTxt+' '+title),q=ci.when>=0?qFromText(r[ci.when]):null;
-    return{id:nid(),source:'upload',done:false,auditId:'',area,custom:area==='custom'?String(areaTxt||title).trim():'',title,q:q??Math.min(cq,3),why:'From uploaded roadmap'+(ci.owner>=0&&r[ci.owner]?' · owner '+r[ci.owner]:''),checks:ci.checks>=0&&r[ci.checks]?String(r[ci.checks]).split(/;|\n/).map(x=>x.trim()).filter(Boolean):[]}}).filter(Boolean);
+    return{id:nid(),source:'upload',done:false,auditId:'',area,custom:area==='custom'?String(areaTxt||title).trim():'',title,q:q??Math.min(cq,11),why:'From uploaded roadmap'+(ci.owner>=0&&r[ci.owner]?' · owner '+r[ci.owner]:''),checks:ci.checks>=0&&r[ci.checks]?String(r[ci.checks]).split(/;|\n/).map(x=>x.trim()).filter(Boolean):[]}}).filter(Boolean);
 }
 async function saveRoadmap(c,R){await put('clients',c.id,{...c,roadmap:R})}
 

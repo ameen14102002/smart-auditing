@@ -18,6 +18,14 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
 - **Statutory compliance (due dates)** (Statutory compliance; HR & payroll): GST, TDS / TCS, PF, ESI, advance tax, annual returns and company filings from the client master; TDS deposit dates filled from the challans.
 - **Analytical review** (Finance & accounts): month-wise sales, purchases and GST with unusual months flagged for explanation.
 
+**Monthly internal audit.** Vouching and GST & TDS compliance are audit topics of their own, mandatory every month. Each audit type lists its real audit procedures (the checklist) and the tools it uses. New audits default to last month.
+
+**Roadmap: quarter, half-year or year.** Generate asks which period. Work is split by month, most important first: planning, opening balances, a statutory dues health-check and catch-up in the first month; vouching, GST & TDS, cash & bank and due dates every month; focus areas by risk score (high first and again each quarter, medium twice, low once, at most two a month); calendar work in its month (half-year confirmations, tax audit readiness, GSTR-9, company filings, year-end verification).
+
+**Follow-up (SIA 390).** Each client's Action taken tab tracks open findings, days past the agreed date, high-risk items to escalate, repeat findings (the same issue raised before), and closure verified by risk (re-test, documentary proof or management confirmation). The Monthly report tab builds one report for management: audits of the month, procedures, findings, open earlier findings and compliance exceptions.
+
+**Data tests** also include Benford's law (first digits) and bills split just under approval limits.
+
 **Import the books once.** The Programme tab takes one Tally Day Book: it feeds vouching, GST & TDS, the bank ledgers (BRS), the debtors and creditors and the analytical review. Annexure F of the report holds the programme and each procedure's result.
 
 1. **Client master.** Enter the entity type, group position, nature of business, regulator, cost-records sector and last year's figures. As you type, the app shows which audits, laws and returns apply, each with its reason and legal basis:
