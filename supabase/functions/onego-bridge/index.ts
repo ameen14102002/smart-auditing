@@ -1,6 +1,7 @@
-// 1Go ↔ Smart Auditing bridge (owner, 23 Nov 2026: "1Go will be the home base app and Smart Auditing a branch app").
+// 1Go <-> Smart Auditing bridge (owner, 23 Nov 2026: "1Go will be the home base app and Smart Auditing a branch app").
 // Called by the 1Go Windows app with the person's 1Go sign-in (x-onego-token). The token is checked with 1Go's own
-// Supabase (the user, and public.my_access(): added by the owner, switched on, access period not over). Then:
+// Supabase (the user, and public.my_access(): added by the owner, switched on, access period not over, and Smart
+// Auditing switched on for that user by the owner). Then:
 //   action "login":   a one-time Smart Auditing sign-in link for the same email (the Smart Auditing tile opens it)
 //   action "clients": 1Go's audit clients are added to / updated in that person's Smart Auditing workspace
 // Nothing else is possible here: no password, no other email, no other workspace.
@@ -20,6 +21,7 @@ async function onegoUser(token: string) {
   const a = await fetch(ONEGO.url + "/rest/v1/rpc/my_access", { method: "POST", headers: { apikey: ONEGO.key, Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ client: "smart-auditing" }) });
   const acc = a.ok ? await a.json() : null;
   if (!acc || !acc.ok || !user?.email) return null;
+  if (!(acc.role === "owner" || acc.audit === true)) return { denied: true } as any;   // the owner, or a user the owner allowed in 1Go's Users
   return { email: String(user.email).toLowerCase(), name: clean(acc.name || "", 80), role: String(acc.role || "") };
 }
 
@@ -29,6 +31,7 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "Sign in to 1Go first." }, 401);
   const who = await onegoUser(token);
   if (!who) return json({ error: "Your 1Go sign-in is not valid or your access has ended." }, 403);
+  if ((who as any).denied) return json({ error: "Smart Auditing is not switched on for you in 1Go. Ask the owner." }, 403);
   let body: any = {}; try { body = await req.json(); } catch (_) { body = {}; }
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
