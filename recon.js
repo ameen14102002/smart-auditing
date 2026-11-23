@@ -242,14 +242,26 @@ function rcCoverage(d){const fm=fyMonths(d.fy),has=(s,m)=>s==='bS'||s==='bP'?!!d
   return `<div class="scroll"><table class="cov"><thead><tr><th>Source</th>${fm.map(m=>`<th class="num">${mLabel(m)}</th>`).join('')}</tr></thead><tbody>${Object.entries(RSRC).map(([s,l])=>`<tr><td>${l}</td>${fm.map(m=>`<td class="num">${has(s,m)?'<span style="color:var(--ok)">●</span>':'<span class="muted">·</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
 function onegoPanel(c,d){
   const can=mode==='supa',fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),H=ui.ho&&ui.ho.client===c.id?ui.ho:null,sel=ui.hoSel||{items:['GSTR1','GSTR2B','GSTR3B','TDS'],months:def.length?def:fm.slice(0,1)};
-  const st=H?({pending:'Waiting for 1Go to open…',working:'1Go is downloading from the portals (type the CAPTCHA in 1Go)…',done:'Done',failed:'1Go could not finish',cancelled:'Cancelled'}[H.status]||H.status):'';
-  return `<div class="panel"><h3>${ic('down')}Get from 1Go</h3><p class="small muted" style="margin:-4px 0 8px">1Go signs in to the GST and Income Tax portals on your computer (you type the CAPTCHA there), downloads the returns and challans, and sends them here. All matching is done in Smart Auditing; 1Go files nothing.</p>
+  const st=H?({pending:'Waiting for 1Go to open…',working:'1Go is downloading from the portals…',done:'Done',failed:'1Go could not finish',cancelled:'Cancelled'}[H.status]||H.status):'';
+  return `<div class="panel"><h3>${ic('down')}Get from 1Go</h3><p class="small muted" style="margin:-4px 0 8px">1Go signs in to the GST and Income Tax portals on your computer (you type the CAPTCHA here), downloads the returns and challans, and sends them here. All matching is done in Smart Auditing; 1Go files nothing.</p>
    ${can?'':'<p class="small"><span class="tag y">Team version only</span> Open Smart Auditing from its web link and sign in to your team workspace: 1Go can only send data into a workspace.</p>'}
    <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B'],['TDS','TDS challans']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-hoitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
    <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-homonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
    ${!c.gstin?'<p class="small"><span class="tag y">GSTIN needed</span> Add the client\'s GSTIN in the client master so 1Go knows which client to download.</p>':''}
    <div class="row"><button class="btn" data-act="hoStart" ${can&&!(H&&['pending','working'].includes(H.status))?'':'disabled'}>${ic('down')}Get from 1Go</button>${H&&H.link?`<a class="btn ghost" href="${esc(H.link)}">Open 1Go again</a>`:''}${H?`<span class="small"><b>${esc(st)}</b>${H.message?' · '+esc(H.message):''}</span>`:''}</div>
+   ${H&&H.status==='working'&&H.captcha?capBox(H.captcha):''}
    ${H&&H.status==='pending'?'<p class="small muted" style="margin:6px 0 0">If nothing opens, update 1Go to the latest version (it adds the Smart Auditing link), then click <b>Open 1Go again</b>.</p>':''}</div>`}
+/* the portal's CAPTCHA (or the Income Tax portal's secure access message) of the running 1Go request, typed here (owner, 23 Nov 2026) */
+function capBox(k){const it=k.portal==='ittan';
+  return `<div class="panel" style="margin-top:10px;border:2px solid var(--accent,#2b6cb0)"><h3>${it?'Income Tax portal':'GST portal'} sign-in for 1Go</h3>
+   ${k.kind==='secure'?`<p class="small">Your secure access message on the portal:</p><p style="font-size:16px;font-weight:700;text-align:center;border:1px solid var(--line,#ccd);border-radius:8px;padding:8px">${esc(k.text||'')}</p><p class="small muted">Click only if this is the message you set on the portal.</p><div class="row"><button class="btn" data-act="hoCap" data-v="YES">Yes, it is mine: sign in</button></div>`
+   :`${k.retry?'<p class="small"><span class="tag r">Not accepted</span> That CAPTCHA was wrong. Type this new one.</p>':'<p class="small muted">Type the characters you see. 1Go signs in on your computer and downloads in the background.</p>'}
+   <img alt="CAPTCHA" src="${esc(k.img||'')}" style="display:block;margin:6px 0;max-width:260px;background:#fff;border-radius:6px">
+   <div class="row"><input id="hocapin" maxlength="12" autocomplete="off" spellcheck="false" style="max-width:12em;font-size:18px;letter-spacing:3px" data-n="${esc(String(k.n||''))}"><button class="btn" data-act="hoCap">Sign in</button></div>`}</div>`}
+async function hoCap(t){const H=ui.ho;if(!H||!H.captcha)return;const v=t.dataset.v||(document.getElementById('hocapin')?.value||'').trim();if(!v)return document.getElementById('hocapin')?.focus();
+  t.disabled=true;const {error}=await sb.rpc('handoff_captcha_answer',{hid:H.id,ans:v});
+  if(error){t.disabled=false;return toast(error.message)}H.captcha=null;H.capSent=true;toast('Sent to 1Go: signing in…');render()}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='hocapin'){const b=document.querySelector('[data-act="hoCap"]');if(b)b.click()}});
 function reconTab(c){
   const d=rcOpen(c),cur=Object.keys(RC).includes(ui.rtab)?ui.rtab:'data';
   const R={};for(const k of Object.keys(RC))R[k]=recon(d,k);
@@ -347,11 +359,12 @@ async function hoStart(c){
   location.href=link;hoWatch();}
 async function hoWatch(){
   clearTimeout(hoWatch.t);const H=ui.ho;if(!H||mode!=='supa')return;
-  const {data,error}=await sb.from('handoffs').select('status,message').eq('id',H.id).maybeSingle();
-  if(!error&&data){const ch=data.status!==H.status||data.message!==H.message;Object.assign(H,data);if(ch)schedule()}
+  const {data,error}=await sb.from('handoffs').select('status,message,captcha').eq('id',H.id).maybeSingle();
+  if(!error&&data){const n=d=>d&&d.captcha?String(d.captcha.n||'')+(d.captcha.at||''):'',ch=data.status!==H.status||data.message!==H.message||n(data)!==n(H);Object.assign(H,data);
+    if(ch){schedule();if(data.captcha&&document.hidden===false)setTimeout(()=>document.getElementById('hocapin')?.focus(),300)}}
   if(H.status==='done'||H.status==='failed'){await hoCollect(H);return}
   if(H.status==='cancelled')return;
-  hoWatch.t=setTimeout(hoWatch,4000)}
+  hoWatch.t=setTimeout(hoWatch,H.status==='working'?2000:4000)}
 async function hoCollect(H){
   const c=S.clients.find(x=>x.id===H.client);if(!c||H.collected)return;H.collected=true;
   const {data:parts,error}=await sb.from('handoff_parts').select('id,name,kind,period,data').eq('handoff_id',H.id).order('id');
@@ -380,6 +393,7 @@ Object.assign(ACT,{
   rcf:t=>{ui.rcf=t.dataset.v;render()},
   g3bTpl:()=>dlFile('GSTR-3B summary template.csv',G3B_TEMPLATE),
   hoStart:()=>hoStart(C()),
+  hoCap:t=>hoCap(t),
   rcCsv:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=k==='r5'?rcCsvRows.tds(r):[...rcCsvRows.mon(r,k),...(r.inv.length?[[],...rcCsvRows.inv(r)]:[])];dlFile(fileSafe(c.name)+' '+RCSHORT[k]+' FY '+d.fy+'.csv',rows.map(x=>x.map(q).join(',')).join('\n'))},
   rcObs:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k);
     const cond=k==='r5'?`TDS deducted in the books of ${inr(R2((d.tB?.rows||[]).filter(x=>x.kind==='ded').reduce((s,x)=>s+x.amount,0)))} was not fully deposited by the due dates: ${inr(r.short)} remains unpaid; estimated interest ${inr(r.interest)}. ${r.unbooked.length} challans are not found in the books.`:
