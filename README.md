@@ -26,6 +26,8 @@ An internal audit workbench for Indian CA firms and in-house audit teams. It run
 
 **Data tests** also include Benford's law (first digits) and bills split just under approval limits.
 
+**Visits, observation reports and the month-end report.** Each client's *Visits & reports* tab: record each visit as it is made (date, time, team, client staff met, audits worked on, work done, pending points). Findings raised from a visit, or on its day, belong to it, and each visit gives its own **observation report** (four visits, four reports; six visits, six). At the end of the month the **internal audit report** is built from them by itself: summary and key observations, the visits and their observations, observations by area, the audits and procedures, earlier findings still open and compliance exceptions. Home lists last month's reports that are ready.
+
 **Quality and follow-through.**
 - **Risk and control matrix:** every checklist step shows the risk it addresses and whether it is preventive or detective; each is tested for design (effective / weak) and operation. RCM view, CSV, and Annexure G in the report.
 - **Reviewer notes (SIA 350):** on any step, procedure or the whole audit, with replies; the reviewer cannot sign and the audit cannot be reported while a note is open.
