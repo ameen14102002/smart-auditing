@@ -1,0 +1,104 @@
+/* Smart Auditing — design layer (23 Nov 2026).
+   IDEA the auditor's tick mark: the logo, the one drawn animation, and the confirmation when a step is satisfactory.
+   COLOUR ledger ink #102347 · paper #f8f9fc · action ultramarine #2f4bd8 · verified green #17875a · audit-pen red #c93a2e · ruling #dde2ee
+   TYPE IBM Plex Sans for the app (tabular figures for amounts); IBM Plex Serif for reports and the sign-in headline
+   MOTION one drawn tick on sign-in; everything else answers an action: 120ms view fade, 200ms toasts and tabs, 600ms tick. */
+:root{--rail:#102347;--rail2:#1a3160;--acc:#2f4bd8;--acc-ink:light-dark(#2b43c4,#a5b2ff);--acc-soft:light-dark(#edf0fd,#1c2a5e);
+  --ok:#17875a;--hi:#c93a2e;--bg:light-dark(#f8f9fc,#0c1530);--sheet:light-dark(#f1f3f8,#111c3d);--card:light-dark(#ffffff,#15224a);
+  --ink:light-dark(#14203d,#e8ecf8);--muted:light-dark(#5a6482,#a7b0cf);--line:light-dark(#dde2ee,#26325e);
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --t-fast:120ms;--t-med:200ms;--t-slow:600ms;--ease:cubic-bezier(.2,.7,.2,1);--r:10px}
+body{font-family:var(--sans);font-size:15px;letter-spacing:-.003em}
+h1,h2,h3,.brand,.kpi b{font-family:var(--sans)}
+h1{font-weight:600;letter-spacing:-.018em;line-height:1.18}
+h2{font-weight:600;letter-spacing:-.01em}h3{font-weight:600}
+table,.num,.kpi b,.tag,input[type=number]{font-variant-numeric:tabular-nums lining-nums}
+.kpi b{font-weight:600;letter-spacing:-.02em}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* brand in the rail */
+.brand{gap:11px;font:600 17px/1.15 var(--sans);letter-spacing:-.01em}
+.brand .mark{width:34px;height:34px;border-radius:9px;background:none;display:block}
+.brand .mark svg{width:34px;height:34px;display:block}
+.brand small{font:400 12px var(--sans);color:#9fb0e6;letter-spacing:0}
+.side{background:var(--rail)}.app{background:linear-gradient(to right,var(--rail) 240px,transparent 240px)}
+
+/* the logo's tick: drawn once where it is shown large; small marks are static */
+.logo .tick{stroke-dasharray:30;stroke-dashoffset:0}
+.logo.draw .tick{animation:draw var(--t-slow) var(--ease) .15s both}
+@keyframes draw{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
+
+/* responses to the person's actions */
+#main.enter{animation:viewin var(--t-fast) ease-out}
+@keyframes viewin{from{opacity:.35}to{opacity:1}}
+.toast{transition:opacity var(--t-med) var(--ease),transform var(--t-med) var(--ease)}
+.toast:not([hidden]){animation:toastin var(--t-med) var(--ease)}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,10px)}}
+.tabs button{transition:color var(--t-fast),box-shadow var(--t-med) var(--ease)}
+.seg button{transition:background-color var(--t-fast),color var(--t-fast),border-color var(--t-fast)}
+.btn{transition:background-color var(--t-fast),box-shadow var(--t-fast),transform 80ms}
+.btn:active{transform:translateY(1px)}
+.progress span{transition:width 300ms var(--ease)}
+/* a step marked satisfactory: a tick drawn in the button */
+.seg button.ok.on .tk{display:inline-block;width:14px;height:14px;margin-right:5px;vertical-align:-2px}
+.seg button.ok.on .tk path{stroke-dasharray:20;stroke-dashoffset:0}
+.seg button.ok.on.just .tk path{animation:draw20 320ms var(--ease) both}
+@keyframes draw20{from{stroke-dashoffset:20}to{stroke-dashoffset:0}}
+.tag.g.pop{animation:pop 360ms var(--ease)}
+@keyframes pop{40%{transform:scale(1.12)}}
+
+/* ---------- sign-in and workspace screens ---------- */
+body.auth .side,body.auth .top{display:none}
+body.auth .app{display:block;background:none}
+body.auth #main{padding:0;max-width:none}
+.auth-wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);min-height:100vh}
+.auth-brand{background:var(--rail);color:#dfe6fb;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden;
+  background-image:repeating-linear-gradient(to bottom,transparent 0 39px,rgb(255 255 255 / .055) 39px 40px)}
+.auth-brand::before{content:"";position:absolute;top:0;bottom:0;left:38px;width:1px;background:rgb(201 58 46 / .45)}
+.auth-brand .logo{width:72px;height:72px;position:relative}
+.auth-brand h1{font:600 clamp(30px,3.4vw,44px)/1.1 var(--serif);color:#fff;letter-spacing:-.015em;margin:28px 0 14px;max-width:18ch;position:relative}
+.auth-brand .lede{font-size:17px;line-height:1.55;max-width:42ch;color:#c4cff0;margin:0 0 34px;position:relative}
+.auth-brand ul{list-style:none;margin:0;padding:0;display:grid;gap:16px;max-width:44ch;position:relative}
+.auth-brand li{display:grid;grid-template-columns:24px 1fr;gap:12px;align-items:start;font-size:15.5px;line-height:1.45;color:#e7ecfb}
+.auth-brand li svg{width:22px;height:22px;margin-top:1px}
+.auth-brand li .tick{stroke-dasharray:20;stroke-dashoffset:0}
+.auth-brand.draw li .tick{animation:draw20 360ms var(--ease) both}
+.auth-brand.draw li:nth-child(1) .tick{animation-delay:.75s}.auth-brand.draw li:nth-child(2) .tick{animation-delay:1s}.auth-brand.draw li:nth-child(3) .tick{animation-delay:1.25s}
+.auth-brand .foot{margin-top:auto;padding-top:40px;font-size:13.5px;color:#9fb0e6;position:relative;max-width:46ch}
+.auth-form{display:flex;align-items:center;justify-content:center;padding:48px 28px;background:var(--bg)}
+.auth-card{width:min(400px,100%)}
+.auth-card h2{font:600 26px/1.2 var(--sans);letter-spacing:-.015em;margin:0 0 6px}
+.auth-card .sub{margin:0 0 22px;color:var(--muted)}
+.auth-switch{display:flex;gap:4px;padding:4px;background:var(--sheet);border-radius:10px;margin-bottom:22px}
+.auth-switch button{flex:1;border:0;background:none;padding:9px 10px;border-radius:7px;font-weight:500;color:var(--muted);cursor:pointer;transition:background-color var(--t-fast),color var(--t-fast)}
+.auth-switch button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgb(16 35 71 / .12)}
+.fld{display:grid;gap:6px;margin-bottom:16px}
+.fld label{font-weight:500;font-size:14px}
+.fld .in{position:relative}
+.fld input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-height:46px;transition:border-color var(--t-fast),box-shadow var(--t-fast)}
+.fld input:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft);outline:none}
+.fld .show{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--acc-ink);font-weight:500;font-size:13.5px;padding:6px 8px;cursor:pointer;border-radius:6px}
+.fld .hint{font-size:13px;color:var(--muted)}
+.fld .meter{height:4px;border-radius:2px;background:var(--line);overflow:hidden}.fld .meter span{display:block;height:100%;width:0;transition:width var(--t-med),background-color var(--t-med)}
+.auth-card .btn.wide{width:100%;justify-content:center;min-height:46px;font-weight:600;font-size:15.5px}
+.auth-card .row-between{display:flex;justify-content:space-between;align-items:center;margin:-6px 0 18px;font-size:14px}
+.auth-msg{min-height:22px;margin:12px 0 0;font-size:14px}.auth-msg.err{color:var(--hi)}.auth-msg.ok{color:var(--ok)}
+.auth-card .note{font-size:13.5px;color:var(--muted);margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+.ws-grid{display:grid;gap:14px}
+.ws-card{border:1px solid var(--line);border-radius:12px;padding:18px;background:var(--card)}
+.ws-card h3{margin:0 0 4px;font-size:16px}.ws-card p{margin:0 0 12px;color:var(--muted);font-size:14px}
+.ws-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.auth-art{width:min(430px,100%);height:auto;margin-top:auto;padding-top:34px;position:relative;filter:drop-shadow(0 18px 30px rgb(0 0 0 / .28))}
+.auth-art .tick{stroke-dasharray:20;stroke-dashoffset:0}.auth-brand.draw .auth-art .tick{animation:draw20 300ms var(--ease) both}
+.auth-art .query{stroke-dasharray:100;stroke-dashoffset:0}.auth-brand.draw .auth-art .query{animation:drawq 500ms var(--ease) both}
+@keyframes drawq{from{stroke-dashoffset:100}}
+.auth-brand.draw .auth-art .mk{animation:fadein 260ms var(--ease) both}
+@keyframes fadein{from{opacity:0}}
+.auth-brand.draw .stamp{animation:stamp 300ms cubic-bezier(.3,1.6,.5,1) 4.55s both;transform-box:fill-box;transform-origin:center}
+@keyframes stamp{from{opacity:0;transform:scale(1.35)}}
+@media (prefers-reduced-motion:reduce){.auth-art .pen{display:none}}
+.auth-brand .foot{margin-top:22px;padding-top:0}
+@media (max-height:980px) and (min-width:861px){.auth-brand ul{display:none}.auth-brand .lede{margin-bottom:0}}
+@media (max-height:700px) and (min-width:861px){.auth-art{display:none}}
+@media (max-width:860px){.auth-wrap{grid-template-columns:1fr}.auth-brand{padding:28px 24px 30px;background-image:none}.auth-brand::before{display:none}.auth-brand .logo{width:48px;height:48px}.auth-brand h1{font-size:28px;margin:16px 0 8px}.auth-brand .lede{margin-bottom:18px;font-size:15.5px}.auth-brand ul,.auth-brand .foot,.auth-art{display:none}.auth-form{padding:28px 20px 40px;align-items:flex-start}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}

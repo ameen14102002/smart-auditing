@@ -3,10 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Smart Auditing: monthly internal audits, from the client's books to a signed report.">
+<meta name="theme-color" content="#102347">
 <title>Smart Auditing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600;700;800&family=Red+Hat+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="design.css">
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;const h=c.closest('table').tHead;c.dataset.l=h?.rows[0]?.cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head>
 <body>
@@ -18,7 +21,7 @@
       <a href="#clients" data-v="clients"><i data-ic="clients"></i>Clients</a>
       <a href="#roadmap" data-v="roadmap"><i data-ic="map"></i>Roadmap</a>
       <a href="#audits" data-v="audits"><i data-ic="audit"></i>Audits<span class="n"></span></a>
-      <a href="#observations" data-v="observations"><i data-ic="flag"></i>Findings<span class="n"></span></a>
+      <a href="#observations" data-v="observations"><i data-ic="flag"></i>Observations<span class="n"></span></a>
       <a href="#reports" data-v="reports"><i data-ic="report"></i>Reports</a>
     </nav>
     <div class="foot" id="status">Loading…</div>
@@ -26,7 +29,7 @@
   <div class="mainwrap">
     <header class="top">
       <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
-      <div class="searchbox"><i data-ic="search"></i><input id="q" type="search" placeholder="Search clients, audits, findings, files  ( / )" autocomplete="off" aria-label="Search"><div id="searchRes" class="pop" hidden></div></div>
+      <div class="searchbox"><i data-ic="search"></i><input id="q" type="search" placeholder="Search clients, audits, observations, files  ( / )" autocomplete="off" aria-label="Search"><div id="searchRes" class="pop" hidden></div></div>
       <div class="row" id="topAction"></div>
     </header>
     <main id="main" tabindex="-1"></main>
@@ -36,7 +39,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="logic.js"></script>
 <script src="ui.js"></script>
-<script src="vouching.js"></script><script src="recon.js"></script><script src="procs.js"></script><script src="follow.js"></script><script src="quality.js"></script><script src="more.js"></script><script src="visits.js"></script>
+<script src="vouching.js"></script><script src="recon.js"></script><script src="procs.js"></script><script src="follow.js"></script><script src="quality.js"></script><script src="more.js"></script><script src="visits.js"></script><script src="design.js"></script>
 <script>document.querySelectorAll('[data-ic]').forEach(el=>{el.outerHTML=ic(el.dataset.ic)})</script>
 </body>
 </html>

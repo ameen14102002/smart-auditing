@@ -210,7 +210,7 @@ function genRoadmap(c,span='year'){
   const add=(q,o)=>{if(q>=cq&&q<=end)push({q,...o})},name=t=>AREA_NAME(t)+' · '+QTR[0][0];
   add(cq,{area:'custom',custom:'Planning',title:'Engagement planning: scope, team and timelines agreed; business and processes understood',prio:0,kind:'Foremost',why:'SIA 220 / SIA 310: plan before fieldwork'});
   add(cq,{area:'custom',custom:'Planning',title:'Risk assessment and this year\'s audit plan approved by management',prio:0,kind:'Foremost',why:'Risk register drives the order of work'});
-  add(cq,{area:'fin',title:'Opening balances agreed with last year\'s audited accounts; last year\'s open findings followed up',prio:0,kind:'Foremost',why:'Start from a clean base'});
+  add(cq,{area:'fin',title:'Opening balances agreed with last year\'s audited accounts; last year\'s open observations followed up',prio:0,kind:'Foremost',why:'Start from a clean base'});
   if(has('stat'))add(cq,{area:'stat',title:'Statutory dues health-check: GST, TDS, PF / ESI and filings pending or late',prio:0,kind:'Foremost',why:'Interest and penalties grow every month'});
   if(cq>0)add(cq,{area:'vouch',title:'Catch-up: vouching and GST reconciliations for Apr – '+QTR[cq-1][0],prio:1,kind:'Foremost',why:'Months before the engagement started'});
   for(let q=cq;q<=end;q++){
