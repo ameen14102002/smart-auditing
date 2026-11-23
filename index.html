@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Auditing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600;700;800&family=Red+Hat+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;const h=c.closest('table').tHead;c.dataset.l=h?.rows[0]?.cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Main navigation">
+    <div class="brand"><span class="mark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="color:#fff"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M9 11.5l2 2 4-4M9 17h6"/></svg></span><span>Smart Auditing<small>Internal audit workbench</small></span></div>
+    <nav class="nav">
+      <a href="#home" data-v="home"><i data-ic="home"></i>Home</a>
+      <a href="#clients" data-v="clients"><i data-ic="clients"></i>Clients</a>
+      <a href="#roadmap" data-v="roadmap"><i data-ic="map"></i>Roadmap</a>
+      <a href="#audits" data-v="audits"><i data-ic="audit"></i>Audits<span class="n"></span></a>
+      <a href="#observations" data-v="observations"><i data-ic="flag"></i>Findings<span class="n"></span></a>
+      <a href="#reports" data-v="reports"><i data-ic="report"></i>Reports</a>
+    </nav>
+    <div class="foot" id="status">Loading…</div>
+  </aside>
+  <div class="mainwrap">
+    <header class="top">
+      <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+      <div class="searchbox"><i data-ic="search"></i><input id="q" type="search" placeholder="Search clients, audits, findings, files  ( / )" autocomplete="off" aria-label="Search"><div id="searchRes" class="pop" hidden></div></div>
+      <div class="row" id="topAction"></div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+  </div>
+</div>
+<div id="toast" class="toast" hidden role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="logic.js"></script>
+<script src="ui.js"></script>
+<script>document.querySelectorAll('[data-ic]').forEach(el=>{el.outerHTML=ic(el.dataset.ic)})</script>
+</body>
+</html>
