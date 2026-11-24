@@ -136,6 +136,10 @@ From the Tally Day Book XML (with bill-wise details), every sale is matched to i
 2. **Party and amount** (not closed by bills in Tally): one to one, one receipt for several bills in a row, or one bill paid in parts.
 3. **On account**: what is left, oldest bill first.
 
+Books are often not adjusted bill-wise, so three figures are kept apart per party: **pending as per Tally** (bill-wise), **settled but not closed in Tally**
+(matched by party and amount or on account: not a real outstanding, only to be adjusted in the books; listed in the sheet "To close in Tally"), and the
+**real outstanding**. The ageing can be seen both ways: real ageing (after matching) and ageing as per Tally.
+
 Each line shows how it was booked in Tally (New Ref, Agst Ref, Advance, On account, or no bill details). The ageing is built from this matching:
 open bills by bill date; advances and on-account amounts not adjusted, by their own date, as credits. The Debtors and Creditors ageing uses the same figures.
 Findings with one-click observations: share not closed bill-wise, over-settled bills, receipts or payments possibly posted to the wrong party,
