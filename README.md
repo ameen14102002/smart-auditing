@@ -140,3 +140,9 @@ Each line shows how it was booked in Tally (New Ref, Agst Ref, Advance, On accou
 open bills by bill date; advances and on-account amounts not adjusted, by their own date, as credits. The Debtors and Creditors ageing uses the same figures.
 Findings with one-click observations: share not closed bill-wise, over-settled bills, receipts or payments possibly posted to the wrong party,
 advances over 90 days, bills open over 180 days, settlement after the credit period (MSME 45 days), opening bills, parties on both sides.
+
+## Excel exports for review
+- **Each procedure**: an Excel button on the procedure (every table, amounts as numbers).
+- **One audit**: "Export the audit to Excel" on the Programme tab, or "Excel of this audit" on the Report tab: programme, checklist, every procedure, the sales and purchase settlement and the observations.
+- **Several audits, or everything so far**: Reports › Audit report in Excel (tick the audits), or the client's month › Month report in Excel. Sheets: Audit report (opinion, summary by audit, key observations), Process and results, Checklist, Observations (with management responses), For discussion (columns for management's view and the decision), and the settlement sheets: ageing, bill vs receipt / payment with days and how each was booked, findings.
+- The automatic internal audit report (HTML / Word, with evidence) is unchanged.
