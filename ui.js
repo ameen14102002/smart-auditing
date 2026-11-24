@@ -417,7 +417,7 @@ async function handleFiles(kind,files,i){
   const a=A(),c=C();if(!files||!files.length)return;
   if(kind==='audit')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,purpose:'Audit file'});
   if(kind==='item')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,item:+i,purpose:'Check '+(+i+1)});
-  if(['books','brsbank','brsbook','pstmt','pbook','stock','far','payreg','as26'].includes(kind))return procFiles(c,kind,files,i);
+  if(['books','brsbank','brsbook','pstmt','pbook','stock','far','payreg','as26','settle'].includes(kind))return procFiles(c,kind,files,i);
   if(kind==='vouch')return importVouchers(c,files[0]);
   if(kind==='rcbooks')return rcBooks(c,files[0]);
   if(kind==='rcportal')return rcPortalFiles(c,[...files]);

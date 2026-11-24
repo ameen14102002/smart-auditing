@@ -129,3 +129,14 @@ The Supabase dashboard needs these settings under **Authentication → URL Confi
 ## Run locally
 
 Serve the folder with any static server (for example `python3 -m http.server`) and open `index.html`. Without Supabase available, the app runs in preview mode, where data stays in the browser tab.
+
+## Sales vs receipts · Purchases vs payments (bill settlement and ageing)
+From the Tally Day Book XML (with bill-wise details), every sale is matched to its receipts and every purchase to its payments, per party:
+1. **Bill reference**: New Ref → Agst Ref, and bills adjusted against an Advance.
+2. **Party and amount** (not closed by bills in Tally): one to one, one receipt for several bills in a row, or one bill paid in parts.
+3. **On account**: what is left, oldest bill first.
+
+Each line shows how it was booked in Tally (New Ref, Agst Ref, Advance, On account, or no bill details). The ageing is built from this matching:
+open bills by bill date; advances and on-account amounts not adjusted, by their own date, as credits. The Debtors and Creditors ageing uses the same figures.
+Findings with one-click observations: share not closed bill-wise, over-settled bills, receipts or payments possibly posted to the wrong party,
+advances over 90 days, bills open over 180 days, settlement after the credit period (MSME 45 days), opening bills, parties on both sides.
