@@ -150,3 +150,15 @@ advances over 90 days, bills open over 180 days, settlement after the credit per
 - **One audit**: "Export the audit to Excel" on the Programme tab, or "Excel of this audit" on the Report tab: programme, checklist, every procedure, the sales and purchase settlement and the observations.
 - **Several audits, or everything so far**: Reports › Audit report in Excel (tick the audits), or the client's month › Month report in Excel. Sheets: Audit report (opinion, summary by audit, key observations), Process and results, Checklist, Observations (with management responses), For discussion (columns for management's view and the decision), and the settlement sheets: ageing, bill vs receipt / payment with days and how each was booked, findings.
 - The automatic internal audit report (HTML / Word, with evidence) is unchanged.
+
+## GST matching: 1Go's engine
+GSTR-2B vs purchases and GSTR-1 vs sales are matched by 1Go's own engine (`gstengine.js`, copied unchanged from 1Go `app/recon2b.js`),
+so both apps reconcile alike: supplier's bill number from Tally's Reference (not the voucher number), numbers written differently
+(core of the number), bills with no GSTIN in the books (by name, date and tax), GSTIN typos, debit notes against the suppliers' credit
+notes, and a tax statement A − B = D − E that closes to 0. 1Go's checks (previous-year bills, reverse charge, ITC not available,
+duplicates, odd rates, wrong state, possible pairs) are listed under "What to do". When 1Go's engine changes, copy it again.
+
+## Excel
+Every Excel is a styled .xlsx written by 1Go's writer (`xlsxsa.js`, offline). The audit's Excel is its internal audit report:
+a report sheet (engagement, opinion, summary by audit, key observations, sign-off), process and results, checklist, observations,
+points for discussion (yellow cells for management's view and the decision), the evidence annex, and each procedure's working.

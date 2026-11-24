@@ -50,7 +50,7 @@ async function parseTallyXML(text,homeState,progress){
     if(/<ISCANCELLED>Yes</i.test(b)||/<ISOPTIONAL>Yes</i.test(b))continue;
     const vt=xtag(b,'VOUCHERTYPENAME'),type=vtypeOf(vt);if(!type)continue;
     const party=xtag(b,'PARTYLEDGERNAME')||xtag(b,'PARTYNAME'),d=xtag(b,'DATE');
-    const r={date:d.length===8?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8):d,type,vtype:vt,vno:xtag(b,'VOUCHERNUMBER'),party,gstin:xtag(b,'PARTYGSTIN')||xtag(b,'GSTREGISTRATIONNUMBER'),pos:xtag(b,'PLACEOFSUPPLY')||xtag(b,'STATENAME'),amount:0,cgst:0,sgst:0,igst:0,ledger:''};
+    const r={date:d.length===8?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8):d,type,vtype:vt,vno:xtag(b,'VOUCHERNUMBER'),ref:xtag(b,'REFERENCE'),party,gstin:xtag(b,'PARTYGSTIN')||xtag(b,'GSTREGISTRATIONNUMBER'),pos:xtag(b,'PLACEOFSUPPLY')||xtag(b,'STATENAME'),amount:0,cgst:0,sgst:0,igst:0,ledger:''};
     const ents=b.match(/<(ALLLEDGERENTRIES|LEDGERENTRIES)\.LIST>[\s\S]*?<\/\1\.LIST>/g)||[];let max=0;
     for(const en of ents){const ln=xtag(en,'LEDGERNAME'),amt=num(xtag(en,'AMOUNT')),a=Math.abs(amt),l=ln.toLowerCase();
       if(/igst|integrated/.test(l))r.igst+=a;else if(/cgst|central tax/.test(l))r.cgst+=a;else if(/sgst|utgst|state tax/.test(l))r.sgst+=a;
@@ -62,14 +62,14 @@ async function parseTallyXML(text,homeState,progress){
   return out}
 function parseTable(rows,kind,homeState){
   const head=rows[0].map(h=>String(h).toLowerCase().trim()),col=(...k)=>{for(const x of k){const i=head.findIndex(h=>h.includes(x));if(i>=0)return i}return -1},colX=(ex,...k)=>{for(const x of k){const i=head.findIndex(h=>h.includes(x)&&!ex.some(e=>h.includes(e)));if(i>=0)return i}return -1};
-  const ci={date:col('date'),type:col('voucher type','vch type','vchtype','type'),vno:col('voucher no','vch no','invoice no','bill no','doc no','document no','voucher number','number'),party:colX(['ledger'],'party','customer','supplier','vendor','name','particulars'),gstin:col('gstin','gst no','gst number'),
+  const ci={ref:col('supplier invoice','supplier inv','supp. inv','supplier bill','reference no','reference','ref no','ref. no'),date:col('date'),type:col('voucher type','vch type','vchtype','type'),vno:col('voucher no','vch no','invoice no','bill no','doc no','document no','voucher number','number'),party:colX(['ledger'],'party','customer','supplier','vendor','name','particulars'),gstin:col('gstin','gst no','gst number'),
     amount:colX(['taxable','tax amount','assessable','cgst','sgst','igst','cess'],'invoice total','invoice value','voucher total','grand total','total','gross','amount','value'),taxable:col('taxable','assessable','net amount'),cgst:col('cgst','central'),sgst:col('sgst','utgst','state tax'),igst:col('igst','integrated'),pos:col('place of supply','pos','state')};
   if(ci.date<0||ci.amount<0)throw new Error('The first row needs at least a Date column and an Amount / Total / Invoice value column.');
   const out=[];
   for(const r of rows.slice(1)){
     const type=kind&&kind!=='auto'?kind:vtypeOf(ci.type>=0?r[ci.type]:'');if(!type)continue;
     const d=toDate(r[ci.date]),g=x=>ci[x]>=0?r[ci[x]]:'';
-    const row={date:d&&!isNaN(d)?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:String(r[ci.date]||''),type,vtype:String(g('type')||VSHORT[type]),vno:String(g('vno')||''),party:String(g('party')||''),gstin:String(g('gstin')||'').trim(),pos:String(g('pos')||''),
+    const row={date:d&&!isNaN(d)?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:String(r[ci.date]||''),type,vtype:String(g('type')||VSHORT[type]),vno:String(g('vno')||''),ref:ci.ref>=0?String(r[ci.ref]||'').trim():'',party:String(g('party')||''),gstin:String(g('gstin')||'').trim(),pos:String(g('pos')||''),
       amount:num(g('amount')),taxable:num(g('taxable')),cgst:num(g('cgst')),sgst:num(g('sgst')),igst:num(g('igst')),ledger:'',posHint:ci.pos>=0};
     if(row.amount)out.push(finishRow(row,homeState));
   }

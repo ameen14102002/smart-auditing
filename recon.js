@@ -133,7 +133,7 @@ function mergeG1(L){const g=L.filter(r=>r.kind==='g1'),rest=L.filter(r=>r.kind!=
 
 /* ---------- storing ---------- */
 function rcOpen(c){return rdoc(c)||{id:rdocId(c,fyNow()),clientId:c.id,fy:fyNow(),bS:null,bP:null,tB:null,g1:{},g2b:{},g3b:{},chl:null,notes:{},handoffs:[],files:[]}}
-const compactBook=r=>({d:r.date,n:r.vno,g:String(r.gstin||'').toUpperCase(),p:r.party,tx:R2(r.taxable),i:R2(r.igst),c:R2(r.cgst),s:R2(r.sgst),v:R2(r.amount),k:/Return/.test(r.type)?(r.type==='salesReturn'?'cn':'dn'):'inv'});
+const compactBook=r=>({d:r.date,n:r.vno,f:String(r.ref||'').trim(),g:String(r.gstin||'').toUpperCase(),p:r.party,tx:R2(r.taxable),i:R2(r.igst),c:R2(r.cgst),s:R2(r.sgst),v:R2(r.amount),k:/Return/.test(r.type)?(r.type==='salesReturn'?'cn':'dn'):'inv'});
 function bookPack(rows,sign){const months={};for(const r of rows){const k=String(r.d||'').slice(0,7);if(!/^\d{4}-\d{2}$/.test(k))continue;const M=months[k]=months[k]||{tot:T0(),n:0,inv:[]};const sg=sign(r);addT(M.tot,r,sg);M.n++;if(M.inv.length<RMAX)M.inv.push(sg<0?{...r,tx:-r.tx,i:-r.i,c:-r.c,s:-r.s,v:-r.v}:r)}return months}
 async function putPortal(c,results,from){
   const d=rcOpen(c),fy=d.fy,fm=new Set(fyMonths(fy));let n=0;const said=[],out={...d,g1:{...d.g1},g2b:{...d.g2b},g3b:{...d.g3b}};
@@ -191,25 +191,25 @@ function matchInv(B,P,t){
     rows.push({st,b,p})}
   for(const p of P)if(!used.has(key(p)))rows.push({st:'portal',b:null,p});
   return rows}
-const RST={match:['g','Matched'],period:['b','Different month'],diff:['y','Value differs'],gstin:['y','GSTIN differs'],books:['r','Only in books'],portal:['r','Only in return'],na:['y','ITC not available']};
+const RST={nogstin:['y','No GSTIN in books'],match:['g','Matched'],period:['b','Different month'],diff:['y','Value differs'],gstin:['y','GSTIN differs'],books:['r','Only in books'],portal:['r','Only in return'],na:['y','ITC not available']};
 function recon(d,k){
-  const t=tol(d),months=[],sumRow=()=>({a:T0(),b:T0()});let inv=[],warn=[];
+  const t=tol(d),months=[],sumRow=()=>({a:T0(),b:T0()}),res0={};let inv=[],warn=[];
   if(k==='r1'||k==='r2'){
     const bk=k==='r1'?'bS':'bP',pk=k==='r1'?'g1':'g2b',BB=[],PP=[],reg=x=>isGstin(x.g)&&(k==='r1'||taxOf(x)!==0);
     const pm=Object.keys(d[pk]||{});
     for(const m of monthsWith(d,bk,pk)){const B=d[bk]?.months?.[m],P=d[pk]?.[m];
       const a=B?(k==='r1'?B.tot:B.inv.filter(reg).reduce((t,x)=>addT(t,x),T0())):null;
       months.push({m,a,b:P?.tot||null,nb:B?.n||0,np:P?.inv?.length||0});
-      if(B&&pm.length)BB.push(...B.inv.filter(x=>isGstin(x.g)&&(k==='r1'||taxOf(x)!==0)).map(x=>({...x,rp:m})));if(P)PP.push(...P.inv.filter(x=>!x.rc).map(x=>({...x,rp:m})));
+      if(B&&pm.length)BB.push(...B.inv.filter(x=>k==='r1'?isGstin(x.g):taxOf(x)!==0).map(x=>({...x,rp:m})));if(P)PP.push(...P.inv.filter(x=>!x.rc).map(x=>({...x,rp:m})));
       if(P?.cut)warn.push(`${RSRC[pk]} ${mLabel(m)} has ${P.cut} documents; only the first ${RMAX} are matched one by one (totals use all).`)}
     /* matched across the year, so an invoice booked in one month and in the return of another is found ("Different month") */
-    if(BB.length&&PP.length){const rows=matchInv(BB,PP,t);if(k==='r2')for(const r of rows)if(r.p&&!r.p.a&&r.st!=='portal')r.st='na';inv=rows.map(r=>({...r,m:(r.b||r.p).rp||String((r.b||r.p).d||'').slice(0,7)}))}
+    if(BB.length&&PP.length){const rows=matchInv(BB,PP,t,k,d);res0.eng=matchInv.last;if(k==='r2')for(const r of rows)if(r.p&&!r.p.a&&r.st!=='portal')r.st='na';inv=rows.map(r=>({...r,m:(r.b||r.p).rp||String((r.b||r.p).d||'').slice(0,7)}))}
     if(k==='r2')warn.push('Purchase books here are bills from registered suppliers that carry GST, compared with ITC available in GSTR-2B (reverse-charge invoices left out).');
     if(k==='r1'&&Object.values(d.g1||{}).some(x=>x.skipped))warn.push('Amendment tables (B2BA, CDNRA, …) in GSTR-1 are not included in these totals; check them separately.');
   }
   if(k==='r3')for(const m of monthsWith(d,'g1','g3b')){const a=d.g1?.[m]?.tot||null,G=d.g3b?.[m];months.push({m,a,b:G?addT(addT(T0(),G.out),G.zero):null})}
   if(k==='r4')for(const m of monthsWith(d,'g2b','g3b')){const a=d.g3b?.[m]?.itc||null,b=d.g2b?.[m]?.tot||null;months.push({m,a,b})}
-  const res={k,months,inv,warn,t};
+  const res={k,months,inv,warn,t,eng:res0.eng||null};
   for(const r of months){r.dtx=r.a&&r.b?R2(r.a.tx-r.b.tx):null;r.dtax=r.a&&r.b?R2(taxOf(r.a)-taxOf(r.b)):null;r.ok=r.dtax!=null&&Math.abs(r.dtax)<=t&&(k==='r4'||Math.abs(r.dtx)<=t)}
   res.both=months.filter(r=>r.a&&r.b);res.diffTax=R2(res.both.reduce((s,r)=>s+r.dtax,0));res.bad=res.both.filter(r=>!r.ok).length;
   res.count={};for(const r of inv)res.count[r.st]=(res.count[r.st]||0)+1;
