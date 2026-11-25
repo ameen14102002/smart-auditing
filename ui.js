@@ -38,7 +38,7 @@ function railStatus(){
 }
 function render(){
   const m=$('#main');sideNav();railStatus();
-  if(mode==='supa'&&!session){setTop([['Sign in']]);m.innerHTML=vLogin();return}
+  if(mode==='supa'&&(mustSignIn||!session)){setTop([['Sign in']]);m.innerHTML=vLogin();return}
   if(mode==='supa'&&!ws){setTop([['Team workspace']]);m.innerHTML=loggingIn?'<p class="sub">Loading your workspace…</p>':vSetup();return}
   const V={home:vHome,clients:vClients,'new-client':()=>vClientForm(null),edit:()=>vClientForm(C()),client:vClient,audits:vAudits,audit:vAudit,observations:vObsList,obs:vObs,roadmap:vRoadmap,vouching:()=>vVouching(),recon:()=>vRecon(),universe:()=>vUniverse(),reports:vReports};
   let html;try{html=(V[ui.view]||vHome)()}catch(e){console.error(e);html=`<div class="empty">Something went wrong showing this page (${esc(e.message)}). <a href="#home">Back to home</a></div>`}
@@ -433,7 +433,7 @@ document.addEventListener('drop',e=>{const d=e.target.closest('.drop');if(!d)ret
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#searchRes').hidden=true;if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$('#q').focus()}});
 document.addEventListener('submit',e=>{
   e.preventDefault();const id=e.target.id;
-  if(id==='loginForm'){sb.auth.signInWithPassword({email:val('lg-email'),password:$('#lg-pass').value}).then(({error})=>{if(error)toast(error.message==='Email not confirmed'?'Confirm your email first (check your inbox).':error.message)});return}
+  if(id==='loginForm'){sb.auth.signInWithPassword({email:val('lg-email'),password:$('#lg-pass').value}).then(({error})=>{if(error)toast(error.message==='Email not confirmed'?'Confirm your email first (check your inbox).':error.message);else{mustSignIn=false;(ws?Promise.resolve():afterLogin()).then(()=>go('home'))}});return}
   if(id==='wsCreate'){sb.rpc('create_workspace',{ws_name:val('ws-name')}).then(async({error})=>{if(error)return toast(error.message);await afterLogin();go('home')});return}
   if(id==='wsJoin'){sb.rpc('join_workspace',{code:val('ws-code')}).then(async({data,error})=>{if(error)return toast(error.message.includes('join code')?'No workspace has that join code':error.message);store.set('sa-ws',data);await afterLogin();go('home')});return}
   if(id==='clientForm'){const ex=ui.view==='edit'?C():null,cid=ex?ex.id:nid(),m=formClient();if(!m.name)return toast('Enter the client name');
@@ -449,7 +449,7 @@ document.addEventListener('submit',e=>{
 });
 
 /* ---------- boot (after every script has loaded) ---------- */
-document.addEventListener('DOMContentLoaded',()=>{if(location.hash.startsWith('#respond')&&typeof respondPage==='function'){respondPage();return}route();
+document.addEventListener('DOMContentLoaded',()=>{if(location.hash.startsWith('#respond')&&typeof respondPage==='function'){respondPage();return}if(!window.claude?.use&&window.supabase&&SB.url)mode='supa';route();
 (async()=>{
   if(window.claude?.use){
     try{db=await window.claude.use('db')}catch(e){db=null}
@@ -462,7 +462,7 @@ document.addEventListener('DOMContentLoaded',()=>{if(location.hash.startsWith('#
   if(window.supabase&&SB.url){
     mode='supa';sb=window.supabase.createClient(SB.url,SB.key);
     sb.auth.onAuthStateChange((ev,s)=>{session=s;
-      if(s&&!ws)setTimeout(afterLogin,0);
+      if(s&&!ws&&!mustSignIn)setTimeout(afterLogin,0);
       if(!s){ws=null;wsList=[];me=null;for(const k of Object.keys(S))S[k]=[];if(channel){sb.removeChannel(channel);channel=null}}
       render();
     });
