@@ -62,9 +62,23 @@ body.auth .side,body.auth .top{display:none}
 body.auth .app{display:block;background:none}
 body.auth #main{padding:0;max-width:none}
 .auth-wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);min-height:100vh;
-  background-color:#0a1834;
+  background-color:#0a1834;position:relative;isolation:isolate;overflow:hidden}
+/* living background: the photo slowly breathes, brand light drifts, dust floats */
+.auth-wrap::before{content:"";position:absolute;inset:-5%;z-index:-1;pointer-events:none;
   background-image:linear-gradient(100deg,rgb(10 24 52 / .93) 0%,rgb(10 24 52 / .8) 45%,rgb(10 24 52 / .55) 100%),url(auth-bg.jpg);
-  background-size:cover;background-position:center;background-repeat:no-repeat}
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  animation:bgzoom 36s ease-in-out infinite alternate}
+.auth-wrap::after{content:"";position:absolute;inset:-8%;z-index:-1;pointer-events:none;
+  background-image:
+    radial-gradient(ellipse 55% 45% at 76% 84%,rgb(23 135 90 / .45),rgb(23 135 90 / 0) 70%),
+    radial-gradient(ellipse 50% 42% at 16% 16%,rgb(47 75 216 / .5),rgb(47 75 216 / 0) 72%),
+    radial-gradient(circle,rgb(255 255 255 / .35) 1px,rgb(255 255 255 / 0) 1.6px);
+  background-size:100% 100%,100% 100%,72px 72px;
+  background-repeat:no-repeat,no-repeat,repeat;
+  animation:glowdrift 17s ease-in-out infinite alternate,dustrise 55s linear infinite}
+@keyframes bgzoom{from{transform:scale(1) translate3d(0,0,0)}to{transform:scale(1.09) translate3d(-1.8%,-1.2%,0)}}
+@keyframes glowdrift{from{transform:translate3d(0,0,0) scale(1);opacity:.55}to{transform:translate3d(-3%,2.5%,0) scale(1.06);opacity:.95}}
+@keyframes dustrise{from{background-position:0 0,0 0,0 0}to{background-position:0 0,0 0,0 -72px}}
 .auth-brand{background:transparent;color:#dfe6fb;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden}
 .auth-brand::before{content:"";position:absolute;top:0;bottom:0;left:38px;width:1px;background:rgb(201 58 46 / .45)}
 .auth-brand .logoimg{position:relative}
