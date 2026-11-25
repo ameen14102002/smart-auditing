@@ -25,8 +25,20 @@ jobs:
       - name: Collect site files
         run: |
           mkdir -p _site
-          cp index.html styles.css logic.js ui.js vouching.js recon.js procs.js follow.js quality.js more.js visits.js settle-engine.js settle.js export.js xlsxsa.js gstengine.js gstlink.js report-xlsx.js design.js design.css .nojekyll _site/
+          cp index.html styles.css logic.js ui.js vouching.js recon.js procs.js follow.js quality.js more.js visits.js settle-engine.js settle.js export.js xlsxsa.js gstengine.js gstlink.js report-xlsx.js rectify.js design.js design.css .nojekyll _site/
       - uses: actions/configure-pages@v5
+      # Re-runs of a failed run keep the old github-pages artifact, and
+      # deploy-pages v5 then fails with "Multiple artifacts named
+      # github-pages". Delete any leftovers from earlier attempts first.
+      - name: Remove old github-pages artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+            --jq '.artifacts[] | select(.name == "github-pages") | .id' \
+            | while read -r id; do
+                gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id" || true
+              done
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
