@@ -2,10 +2,10 @@
 const RECOVERY=/type=recovery/.test(location.hash);
 /* the mark: the real 3D render — magnifier over the ledger — as an app icon.
    Used everywhere (sidebar, sign-in hero, favicon) so the brand is one image. */
-function logoSVG(size,o={}){return `<span class="logoimg${o.draw?' draw':''}" style="width:${size}px;height:${size}px" role="img" aria-label="Smart Auditing"><img src="logo-3d.png" alt="" width="${size}" height="${size}"><span class="shine"></span></span>`}
+function logoSVG(size,o={}){return `<span class="logoimg${o.draw?' draw':''}" style="width:${size}px;height:${size}px" role="img" aria-label="Smart Auditing"><img src="logo-3d.png?v=2" alt="" width="${size}" height="${size}"><span class="shine"></span></span>`}
 const tickSVG=(c='#4fd39b')=>`<svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="none" stroke="${c}" stroke-opacity=".35" stroke-width="1.5"/><path class="tick" pathLength="20" d="M6.5 11.5l3 3 6-7" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 (function brand(){const b=document.querySelector('.side .brand');if(b)b.innerHTML=`<span class="mark">${logoSVG(34)}</span><span>Smart Auditing<small>Monthly internal audit</small></span>`;
-  const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='logo-3d.png';document.head.appendChild(fav);
+  const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='logo-3d.png?v=2';document.head.appendChild(fav);
   const h=document.querySelector('.nav a[data-v="home"]');if(h)h.lastChild.textContent='Dashboard';})();
 
 /* ---------- sign-in, create account, reset ---------- */
@@ -45,13 +45,9 @@ let _drawn=false;
 function authBrand(){let seen=false;try{seen=!!localStorage.getItem('sa-auth-seen')}catch(e){}
   const d=!_drawn&&!seen;_drawn=true;if(d){try{localStorage.setItem('sa-auth-seen','1')}catch(e){}}
   return `<section class="auth-brand${d?' draw':''}"><div class="brandrow">${logoSVG(56,{draw:d})}<span class="wordmark">Smart Auditing<small>Internal audit workbench</small></span></div>
-  <h1>Find it. Prove it. Fix it. Re-test it.</h1>
-  <p class="lede">The internal audit workbench for CA firms — every client, every month, from plan to signed report.</p>
+  <h1>From audit planning to the signed report.</h1>
+  <p class="lede">The internal audit workbench for CA firms — every client, every month, with evidence behind every finding.</p>
   <ul><li>${tickSVG()}<span>Vouch, reconcile and analyse the books — GST, TDS, bank and ledgers tied back to source</span></li><li>${tickSVG()}<span>Raise observations with evidence, agree the reply with management, track to closure</span></li><li>${tickSVG()}<span>Re-test rectification and carry open items into next month's report</span></li></ul>
-  <div class="auth-stage">${ledgerArt()}
-   <div class="chip c1"><i style="background:#17875a"></i><span><b>Bank reconciliation</b>Difference ₹0 · agreed to statement</span></div>
-   <div class="chip c2"><i style="background:#c93a2e"></i><span><b>Observation raised · High</b>Rent paid without a lease</span></div>
-   <div class="chip c3"><i style="background:#2f4bd8"></i><span><b>Visit 3 of 4</b>Observation report ready</span></div></div>
   <p class="foot">Part of the 1Go suite · Your firm's data stays in your workspace</p></section>`}
 const pwField=(id,ac,label,extra='')=>`<div class="fld"><label for="${id}">${label}</label><div class="in"><input id="${id}" type="password" autocomplete="${ac}" minlength="8" required style="padding-right:64px"><button type="button" class="show" data-show="${id}" aria-label="Show password" aria-pressed="false">Show</button></div>${extra}</div>`;
 vLogin=function(){
@@ -85,8 +81,8 @@ document.addEventListener('submit',async e=>{const f=e.target,id=f.id;if(!['logi
   if(!sb)return authMsg('Sign-in works in the online version of Smart Auditing.');
   if(id==='loginForm'||id==='signupForm'){const email=val('lg-email').trim(),password=document.getElementById('lg-pass').value;
     if(!/^\S+@\S+\.\S+$/.test(email))return authMsg('Enter your email address, like name@firm.com.');if(password.length<8)return authMsg('The password needs at least 8 characters.');
-    if(id==='loginForm'){busy('Signing in…');const {error}=await sb.auth.signInWithPassword({email,password});done();if(error)return authMsg(nice(error))}
-    else{busy('Creating account…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});done();if(error)return authMsg(nice(error));if(!data.session){ui.authMode='in';render();authMsg('Account created. Open the link we sent to '+email+' to confirm it, then sign in.',true)}}}
+    if(id==='loginForm'){busy('Signing in…');const {error}=await sb.auth.signInWithPassword({email,password});done();if(error)return authMsg(nice(error));mustSignIn=false;if(!ws)await afterLogin();go('home')}
+    else{busy('Creating account…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});done();if(error)return authMsg(nice(error));if(!data.session){ui.authMode='in';render();authMsg('Account created. Open the link we sent to '+email+' to confirm it, then sign in.',true)}else{mustSignIn=false;if(!ws)await afterLogin()}}}
   if(id==='pwReset'){const email=val('rs-email').trim();if(!/^\S+@\S+\.\S+$/.test(email))return authMsg('Enter your email address, like name@firm.com.');busy('Sending…');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});done();if(error)return authMsg(nice(error));authMsg('If an account uses '+email+', a reset link is on its way. Check your inbox.',true)}
   if(id==='pwNew'){const p=document.getElementById('pw-new').value;if(p.length<8)return authMsg('The password needs at least 8 characters.');busy('Saving…');const {error}=await sb.auth.updateUser({password:p});done();if(error)return authMsg(nice(error));history.replaceState(null,'',location.pathname+'#home');location.reload()}},true);
 
@@ -101,7 +97,7 @@ document.addEventListener('pointermove',e=>{const st=document.querySelector('.au
 const _render0=render;let _lastView='';
 render=function(){_render0();
   if(document.querySelector('.auth-brand.draw .pen:not(.ran)')){const p=document.querySelector('.auth-brand.draw .pen');p.classList.add('ran');penRun()}
-  const auth=(mode==='supa'&&(!session||!ws||(RECOVERY&&session)));document.body.classList.toggle('auth',!!auth);
+  const auth=(mode==='supa'&&(mustSignIn||!session||!ws||(RECOVERY&&session)));document.body.classList.toggle('auth',!!auth);
   if(RECOVERY&&session&&mode==='supa'){document.getElementById('main').innerHTML=vLogin()}
   const m=document.getElementById('main'),key=ui.view+'|'+ui.id+'|'+(ui.atab||'')+'|'+(ui.ctab||'');if(key!==_lastView){m.classList.remove('enter');void m.offsetWidth;m.classList.add('enter');_lastView=key}
   for(const b of document.querySelectorAll('.seg button.ok.on'))if(!b.querySelector('.tk'))b.insertAdjacentHTML('afterbegin','<svg class="tk" viewBox="0 0 14 14" aria-hidden="true"><path pathLength="20" d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');

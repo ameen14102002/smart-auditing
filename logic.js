@@ -25,7 +25,7 @@ const ui={view:'home',id:null,ctab:'overview',atab:'checklist',f:{client:'',rati
 let db=null,users=null,dl=null,me=null,live=false,names={},pending=false;
 /* Hosted mode: Supabase (public URL + publishable key; data is protected by row-level security). */
 const SB={url:'https://mkwwrkvsjafzxvlbfwla.supabase.co',key:'sb_publishable_VLkwQvLmUKFenUfC56VDxw_tmr49Adq'};
-let mode='preview',sb=null,session=null,ws=null,wsList=[],loggingIn=false,rtTimer=null,channel=null;
+let mode='preview',sb=null,session=null,ws=null,wsList=[],loggingIn=false,rtTimer=null,channel=null,mustSignIn=true;
 const browserDl={save:({filename,data})=>{const u=URL.createObjectURL(new Blob([data],{type:filename.endsWith('.csv')?'text/csv':'text/html'}));const a=document.createElement('a');a.href=u;a.download=String(filename).replace(/[^\p{L}\p{N}\s._,()&+\-]/gu,'-').replace(/-{2,}/g,'-');document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);return Promise.resolve({status:'saved'})}};
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const $=s=>document.querySelector(s);
