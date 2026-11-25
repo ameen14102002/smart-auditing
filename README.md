@@ -112,8 +112,11 @@ Thresholds are as of November 2026. The applicability results are a planning gui
 | `logic.js` | Data, storage, sign-in, applicability rules, roadmap, data tests, evidence storage |
 | `ui.js` | Views, routing (URL hash), events, report builder |
 | `vouching.js` | Voucher import (Tally XML, CSV, Excel), analysis, sampling, vouching worksheet |
+| `rectify.js` | The rectification loop: materiality (SIA 320), journal-entry testing (SIA 11), findings hub, finding quality gate (SIA 370), closure enforcement (SIA 390), escalation + Audit Committee pack, confirmation tracker, plan approval, report lock with versions |
+| `tests/rectify.test.js` | Unit tests for the rectification core (`npm test`, no dependencies) |
 | `supabase/migrations/` | Database schema, access rules, evidence bucket and policies |
 | `.github/workflows/pages.yml` | Deploys the site to GitHub Pages on every push to `main` |
+| `.github/workflows/test.yml` | Syntax-checks every JS file and runs the unit tests on every push / PR |
 
 Libraries loaded from CDNs: `@supabase/supabase-js` 2.45.4 (jsDelivr). SheetJS 0.18.5 (Excel reading) and JSZip 3.10.1 (evidence ZIP) are loaded from cdnjs only when needed.
 
@@ -181,3 +184,16 @@ Evidence annex. Indian number format, banded rows, print-ready (landscape, fit t
 1Go writes its progress to the request (handoff_note) and sends each return as soon as it is downloaded; Smart Auditing takes them in
 as they arrive. A working request stays alive (an hour after the last sign of life, up to 12 hours): before, a run of several GSTR-1
 JSON months outlived the 2-hour request and Smart Auditing waited on "working". Needs 1Go 1.67.7.
+
+## The rectification loop: Find → Prove → Discuss → Fix → Re-test
+
+Every exception from every procedure lands in the **Findings hub** (top of each audit's Programme tab), with its amount assessed against **materiality** (overall / performance / trivial, SIA 320, suggested from the client master and overridable per client). One click raises a draft finding.
+
+- **Prove (SIA 370):** the finding quality gate blocks sending a finding to management until title, condition, criteria, cause, effect, recommendation, owner and target date are all filled. The gate panel on each observation shows what is missing.
+- **Journal-entry testing (SIA 11):** in the Data tests tab, upload the journal export — period-end cut-off, round sums, entries at or above overall materiality, Sundays, adjustment / suspense narrations and duplicates are flagged, each with one-click findings.
+- **Discuss (SIA 360):** the management link now refuses incomplete findings; responses flow back into the observations.
+- **Fix:** Action taken tracks owner and agreed date; the Home page escalates high-risk findings over 30 days late and repeat findings to the **Audit Committee**, with a one-click **Audit Committee pack** (scope, materiality, opinion with stated criteria, key findings, overdue actions, compliance exceptions).
+- **Re-test (SIA 390):** high-risk findings cannot close without evidence attached and a re-test note; the Action taken tab lists every closure gap.
+- **Discipline:** reviewer sign-off is required before an audit can be Reported; reporting or closing keeps a version snapshot (restorable, history preserved); confirmations are tracked per party; the audit plan approval and independence are recorded per client.
+
+Run the tests with `npm test` (Node 18+, no dependencies). CI (`.github/workflows/test.yml`) syntax-checks all JS and runs them on every push.

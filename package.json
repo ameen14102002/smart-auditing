@@ -1,0 +1,13 @@
+{
+  "name": "smart-auditing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Internal audit workbench for Indian CA firms (static site on GitHub Pages, Supabase backend).",
+  "scripts": {
+    "test": "node --test tests/rectify.test.js",
+    "check": "for f in *.js; do node --check \"$f\" || exit 1; done && echo 'All JS files parse OK'"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
