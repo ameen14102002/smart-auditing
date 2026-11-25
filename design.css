@@ -23,9 +23,19 @@ table,.num,.kpi b,.tag,input[type=number]{font-variant-numeric:tabular-nums lini
 .brand small{font:400 12px var(--sans);color:#9fb0e6;letter-spacing:0}
 .side{background:var(--rail)}.app{background:linear-gradient(to right,var(--rail) 240px,transparent 240px)}
 
-/* the logo's tick: drawn once where it is shown large; small marks are static */
-.logo .tick{stroke-dasharray:30;stroke-dashoffset:0}
-.logo.draw .tick{animation:draw var(--t-slow) var(--ease) .15s both}
+/* the logo: the real 3D render as an app icon — scales in with a shine sweep, once on first sign-in */
+.logoimg{position:relative;display:inline-block;border-radius:22%;overflow:hidden;box-shadow:0 6px 18px rgb(3 10 30 / .35),0 0 0 1px rgb(255 255 255 / .12);flex:none}
+.logoimg img{width:100%;height:100%;object-fit:cover;display:block}
+.logoimg .shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgb(255 255 255 / .5) 50%,transparent 70%);transform:translateX(-130%);pointer-events:none}
+.logoimg.draw{animation:logoIn .6s var(--ease) .1s both}
+.logoimg.draw .shine{animation:sweep .9s var(--ease) .5s both}
+@keyframes logoIn{from{opacity:0;transform:scale(.82) translateY(8px)}to{opacity:1;transform:none}}
+@keyframes sweep{to{transform:translateX(130%)}}
+.brand .mark .logoimg{width:34px;height:34px}
+.auth-brand .logoimg{width:56px;height:56px}
+.auth-brand .brandrow{display:flex;align-items:center;gap:16px;position:relative}
+.auth-brand .wordmark{font:600 22px/1.1 var(--sans);letter-spacing:-.01em;color:#fff}
+.auth-brand .wordmark small{display:block;font:400 13px var(--sans);color:#9fb0e6;margin-top:3px;letter-spacing:0}
 @keyframes draw{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
 
 /* responses to the person's actions */
@@ -55,7 +65,7 @@ body.auth #main{padding:0;max-width:none}
 .auth-brand{background:var(--rail);color:#dfe6fb;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden;
   background-image:repeating-linear-gradient(to bottom,transparent 0 39px,rgb(255 255 255 / .055) 39px 40px)}
 .auth-brand::before{content:"";position:absolute;top:0;bottom:0;left:38px;width:1px;background:rgb(201 58 46 / .45)}
-.auth-brand .logo{width:72px;height:72px;position:relative}
+.auth-brand .logoimg{position:relative}
 .auth-brand h1{font:600 clamp(30px,3.4vw,44px)/1.1 var(--serif);color:#fff;letter-spacing:-.015em;margin:28px 0 14px;max-width:18ch;position:relative}
 .auth-brand .lede{font-size:17px;line-height:1.55;max-width:42ch;color:#c4cff0;margin:0 0 34px;position:relative}
 .auth-brand ul{list-style:none;margin:0;padding:0;display:grid;gap:16px;max-width:44ch;position:relative}
@@ -94,17 +104,17 @@ body.auth #main{padding:0;max-width:none}
 @keyframes drawq{from{stroke-dashoffset:100}}
 .auth-brand.draw .auth-art .mk{animation:fadein 260ms var(--ease) both}
 @keyframes fadein{from{opacity:0}}
-.auth-brand.draw .stamp{animation:stamp 300ms cubic-bezier(.3,1.6,.5,1) 4.55s both;transform-box:fill-box;transform-origin:center}
+.auth-brand.draw .stamp{animation:stamp 300ms cubic-bezier(.3,1.6,.5,1) 2.85s both;transform-box:fill-box;transform-origin:center}
 @keyframes stamp{from{opacity:0;transform:scale(1.35)}}
 @media (prefers-reduced-motion:reduce){.auth-art .pen{display:none}}
 .auth-brand .foot{margin-top:22px;padding-top:0}
 @media (max-height:980px) and (min-width:861px){.auth-brand ul{display:none}.auth-brand .lede{margin-bottom:0}}
 @media (max-height:700px) and (min-width:861px){.auth-art{display:none}}
-@media (max-width:860px){.auth-wrap{grid-template-columns:1fr}.auth-brand{padding:28px 24px 30px;background-image:none}.auth-brand::before{display:none}.auth-brand .logo{width:48px;height:48px}.auth-brand h1{font-size:28px;margin:16px 0 8px}.auth-brand .lede{margin-bottom:18px;font-size:15.5px}.auth-brand ul,.auth-brand .foot,.auth-art{display:none}.auth-form{padding:28px 20px 40px;align-items:flex-start}}
+@media (max-width:860px){.auth-wrap{grid-template-columns:1fr}.auth-brand{padding:28px 24px 30px;background-image:none}.auth-brand::before{display:none}.auth-brand .logoimg{width:44px;height:44px}.auth-brand h1{font-size:28px;margin:16px 0 8px}.auth-brand .lede{margin-bottom:18px;font-size:15.5px}.auth-brand ul,.auth-brand .foot,.auth-art{display:none}.auth-form{padding:28px 20px 40px;align-items:flex-start}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 /* premium pass: depth, light and a product stage */
-.auth-brand{background-color:#0a1834;background-image:radial-gradient(ellipse 70% 55% at 78% 82%,rgb(47 75 216 / .55),transparent 70%),radial-gradient(ellipse 50% 40% at 8% 0%,rgb(79 211 155 / .13),transparent 70%),repeating-linear-gradient(to bottom,transparent 0 39px,rgb(255 255 255 / .045) 39px 40px)}
+.auth-brand{background-color:#0a1834;background-image:linear-gradient(100deg,rgb(10 24 52 / .78) 0%,rgb(10 24 52 / .35) 55%,rgb(10 24 52 / .15) 100%),radial-gradient(ellipse 70% 55% at 78% 82%,rgb(47 75 216 / .35),transparent 70%),url(auth-bg.jpg);background-size:cover;background-position:center}
 .auth-brand h1{font-size:clamp(34px,3.3vw,50px);max-width:19ch;line-height:1.06;letter-spacing:-.02em;font-weight:600}
 .auth-brand .lede{color:#b9c6ee}
 .auth-stage{position:relative;margin-top:auto;padding-top:28px;width:min(600px,100%);--rx:0deg;--ry:0deg;perspective:1400px}
