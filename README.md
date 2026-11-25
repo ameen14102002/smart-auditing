@@ -162,3 +162,22 @@ duplicates, odd rates, wrong state, possible pairs) are listed under "What to do
 Every Excel is a styled .xlsx written by 1Go's writer (`xlsxsa.js`, offline). The audit's Excel is its internal audit report:
 a report sheet (engagement, opinion, summary by audit, key observations, sign-off), process and results, checklist, observations,
 points for discussion (yellow cells for management's view and the decision), the evidence annex, and each procedure's working.
+
+## Sales vs receipts on real Day Books (settle-engine.js)
+Proven on a real Tally Day Book (393 MB, UTF-16, 5,549 vouchers): every open bill agrees with Tally's own bill-wise outstanding
+(179 of 179 sales bill names, 24 of 24 purchase) and every party ties back to the books. It reads in about 2.4 seconds in the browser.
+Orders and delivery notes (which repeat the invoice) are left out; receipts and payments are known by their bank or cash ledger,
+whatever the voucher type is called; bill numbers are compared on their core (AXE/26-27/0001 = AXE/2627/0001); bill numbers and party
+names are read from narrations; a bill can be closed by a receipt together with a discount note, TDS or a journal; small differences
+(bank charges) are shown; invoices booked against another bill's number, and receipts booked to another ledger, are reported.
+
+## The Excel report (report-xlsx.js)
+Cover and contents · Summary (opinion, a traffic light for every procedure, what to fix first) · How to read (colours, words used) ·
+one sheet per procedure (what we checked in plain words, result at a glance, problems, observations, evidence, conclusion) with its
+colour-coded detail sheets · Findings register · Observations · For discussion (yellow cells for management) · Documents used ·
+Evidence annex. Indian number format, banded rows, print-ready (landscape, fit to width, page numbers).
+
+## Get from 1Go (migration 0010)
+1Go writes its progress to the request (handoff_note) and sends each return as soon as it is downloaded; Smart Auditing takes them in
+as they arrive. A working request stays alive (an hour after the last sign of life, up to 12 hours): before, a run of several GSTR-1
+JSON months outlived the 2-hour request and Smart Auditing waited on "working". Needs 1Go 1.67.7.

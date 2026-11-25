@@ -11,94 +11,27 @@ PR.settle={n:'Sales vs receipts · Purchases vs payments',ref:'SIA 320 · SA 505
 for(const t of ['o2c','p2p','fin'])if(UNI[t]&&!UNI[t].procs.includes('settle'))UNI[t].procs.unshift('settle');
 PK.splice(PK.indexOf('drs'),0,'settle');
 
-/* ---------- read: every party posting with its bill allocations ---------- */
-const STYPE=v=>{const t=String(v||'').toLowerCase();if(/order|quotation|memo/.test(t))return'';if(/credit ?note|sales ?return|rejection ?in/.test(t))return'cn';if(/debit ?note|purchase ?return|rejection ?out/.test(t))return'dn';
-  if(/purchase/.test(t))return'p';if(/sales|invoice/.test(t))return's';if(/receipt/.test(t))return'r';if(/payment/.test(t))return'y';if(/journal/.test(t))return'j';return''};
-const BT={'new ref':'N','agst ref':'A','advance':'V','on account':'O'};
-function parseSettleXML(text){
-  const P=[],re=/<VOUCHER[\s>]/g;let m;
-  while((m=re.exec(text))){const e=text.indexOf('</VOUCHER>',m.index);if(e<0)break;const b=text.slice(m.index,e);re.lastIndex=e+10;
-    if(/<ISCANCELLED>Yes</i.test(b)||/<ISOPTIONAL>Yes</i.test(b))continue;
-    const vt=xtag(b,'VOUCHERTYPENAME')||(b.slice(0,300).match(/VCHTYPE="([^"]*)"/)||[])[1]||'',t=STYPE(vt)||STYPE((b.slice(0,300).match(/VCHTYPE="([^"]*)"/)||[])[1]);if(!t)continue;
-    const dt=xtag(b,'DATE'),d=dt.length===8?dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8):ymdOf(dt);if(!d)continue;
-    const party=xtag(b,'PARTYLEDGERNAME'),vno=xtag(b,'VOUCHERNUMBER'),nar=xtag(b,'NARRATION').slice(0,90);
-    for(const en of b.match(/<(ALLLEDGERENTRIES|LEDGERENTRIES)\.LIST>[\s\S]*?<\/\1\.LIST>/g)||[]){
-      const l=xtag(en,'LEDGERNAME'),a=num(xtag(en,'AMOUNT'));if(!l||!a)continue;
-      const al=[];for(const ba of en.match(/<BILLALLOCATIONS\.LIST>[\s\S]*?<\/BILLALLOCATIONS\.LIST>/g)||[]){const x=num(xtag(ba,'AMOUNT'));if(!x)continue;
-        const cp=xtag(ba,'BILLCREDITPERIOD');al.push([xtag(ba,'NAME'),BT[xtag(ba,'BILLTYPE').toLowerCase()]||'O',R2(Math.abs(x)),x<0?1:0,parseInt(cp)||0])}
-      const isParty=al.length||(l===party&&!BANK_RE.test(l)&&!/^cash/i.test(l));if(!isParty)continue;
-      const dp=en.match(/<ISDEEMEDPOSITIVE>(Yes|No)</i),dr=dp?/yes/i.test(dp[1]):a<0;
-      P.push([d,t,vt,vno,l,dr?1:0,R2(Math.abs(a)),al,nar])}}
-  return P}
+/* ---------- read and match: settle-engine.js (tested on a real 393 MB Tally Day Book) ---------- */
 async function settleImport(c,file,text){
-  const P=parseSettleXML(text);if(!P.length)throw new Error('No sales, purchase, receipt or payment entries with parties were found in this Tally file.');
-  const ds=P.map(p=>p[0]).sort(),d=pOpen(c);
-  await savep({...d,settle:{file:file.name,at:new Date().toISOString(),from:ds[0],to:ds[ds.length-1],P:P.slice(0,60000),opt:d.settle?.opt||{}}});
-  _stMemo={};return P}
-
-/* ---------- match ---------- */
+  const D=SETTLE.parse(text);if(!D.P.length)throw new Error('No sales, purchase, receipt or payment entries with parties were found in this Tally file.');
+  const d=pOpen(c);
+  await savep({...d,settle:{file:file.name,at:new Date().toISOString(),from:D.from,to:D.to,P:D.P.slice(0,80000),X:D.X.slice(0,20000),stats:D.stats,opt:d.settle?.opt||{},v:2}});
+  _stMemo={};return D.P}
 let _stMemo={};
 function settleCalc(d,side){
   const S0=d.settle;if(!S0?.P?.length)return null;const key=S0.at+side+JSON.stringify(S0.opt||{});if(_stMemo[key])return _stMemo[key];
-  const tol=1,credit=+(S0.opt?.[side+'days'])||(side==='S'?30:45);
-  /* which side each party is on */
-  const role={};for(const p of S0.P){const r=role[p[4]]=role[p[4]]||{s:0,p:0,r:0,y:0,dr:0,cr:0};
-    if(p[1]==='s'||p[1]==='cn')r.s+=p[6];else if(p[1]==='p'||p[1]==='dn')r.p+=p[6];else if(p[1]==='r')r.r+=p[6];else if(p[1]==='y')r.y+=p[6];if(p[5])r.dr+=p[6];else r.cr+=p[6]}
-  const sideOf=n=>{const r=role[n];if(r.s||r.p)return r.s>=r.p?'S':'P';if(r.r&&!r.y)return'S';if(r.y&&!r.r)return'P';return r.dr>=r.cr?'S':'P'};
-  const both=Object.keys(role).filter(n=>role[n].s&&role[n].p);
-  const billDr=side==='S'?1:0,parties={};
-  const bothSet=new Set(both),pSide=p=>bothSet.has(p[4])?(/^(s|cn|r)$/.test(p[1])?'S':/^(p|dn|y)$/.test(p[1])?'P':sideOf(p[4])):sideOf(p[4]);
-  for(const p of S0.P){if(pSide(p)!==side)continue;(parties[p[4]]=parties[p[4]]||[]).push(p)}
-  const bills=[],pool=[],opening=[],over=[],allU=[];
-  for(const [name,L] of Object.entries(parties)){
-    L.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
-    const B=[],U=[],refs={};
-    for(const p of L){const pieces=p[7].length?p[7]:[['','',p[6],p[5],0]];
-      for(const [ref,ty,amt,dr0,cp] of pieces){const dr=p[7].length?dr0:p[5],isBill=dr===billDr;
-        const base={d:p[0],t:p[1],vt:p[2],vno:p[3],party:name,ref,ty,amt,nar:p[8]};
-        if(isBill){
-          if(ty==='A'&&refs[ref]&&refs[ref].src){/* a bill adjusted against an advance (or a receipt booked as New Ref) */
-            const src=refs[ref].src,take=Math.min(amt,src.rem);src.rem=R2(src.rem-take);
-            const bl={...base,cp,rem:R2(amt-take),by:take?[{d:src.d,vt:src.vt,vno:src.vno,amt:take,how:'adv',ty:src.ty}]:[],how:take?'adv':null,refd:take};B.push(bl);continue}
-          const bl={...base,cp,rem:amt,by:[],how:null,refd:0};B.push(bl);
-          if(ty==='N'||(ty==='A'&&!refs[ref]))(refs[ref]=refs[ref]||{}).bill=refs[ref]?.bill||bl;
-          if(ty==='A'&&!refs[ref]?.bill)bl.orphan=1}
-        else{
-          if(ty==='A'){const bl=refs[ref]?.bill;
-            if(bl){const take=Math.min(amt,bl.rem);bl.rem=R2(bl.rem-take);bl.refd=R2(bl.refd+take);if(take)bl.by.push({d:p[0],vt:p[2],vno:p[3],amt:take,how:'ref',ty:'A'});
-              if(amt-take>tol){over.push({...base,bill:bl,excess:R2(amt-take)});U.push({...base,amt:R2(amt-take),rem:R2(amt-take),x:'over'})}}
-            else if(refs[ref]?.src){refs[ref].src.rem=R2(refs[ref].src.rem+amt)}
-            else opening.push(base)}
-          else{const u={...base,rem:amt};U.push(u);if(ty==='V'||ty==='N')(refs[ref]=refs[ref]||{}).src=u}}}}
-    for(const b of B)if(b.how===null&&b.refd&&b.rem<=tol){b.how='ref';b.rem=0}
-    for(const b of B)b.t0=b.rem;for(const u of U){u.t0=u.rem;allU.push(u)}
-    /* tier 2: party and amount */
-    const open=()=>B.filter(b=>b.rem>tol).sort((a,b)=>a.d<b.d?-1:1),free=()=>U.filter(u=>u.rem>tol).sort((a,b)=>a.d<b.d?-1:1);
-    const near=(b,u)=>Math.abs(dayDiff(u.d,b.d))+(u.d<b.d?400:0);
-    for(const b of open()){const c=free().filter(u=>Math.abs(u.rem-b.rem)<=tol).sort((x,y)=>near(b,x)-near(b,y))[0];
-      if(c){b.by.push({d:c.d,vt:c.vt,vno:c.vno,amt:b.rem,how:'amt',ty:c.ty});c.rem=R2(c.rem-b.rem);if(c.rem<=tol)c.rem=0;b.rem=0;b.how=b.refd?'refamt':'amt'}}
-    for(const u of free()){const O=open().filter(b=>b.d<=u.d||dayDiff(b.d,u.d)<=7);
-      for(let i=0;i<O.length&&u.rem>tol;i++){let s=0;for(let j=i;j<Math.min(O.length,i+8);j++){s=R2(s+O[j].rem);if(j>i&&Math.abs(s-u.rem)<=tol){
-        for(const b of O.slice(i,j+1)){b.by.push({d:u.d,vt:u.vt,vno:u.vno,amt:b.rem,how:'grp',ty:u.ty});b.rem=0;b.how=b.refd?'refamt':'grp'}u.rem=0;break}if(s>u.rem+tol)break}}}
-    for(const b of open()){const F=free().filter(u=>u.d>=b.d);
-      for(let i=0;i<F.length&&b.rem>tol;i++){let s=0;for(let j=i;j<Math.min(F.length,i+5);j++){s=R2(s+F[j].rem);if(j>i&&Math.abs(s-b.rem)<=tol){
-        for(const u of F.slice(i,j+1)){b.by.push({d:u.d,vt:u.vt,vno:u.vno,amt:u.rem,how:'split',ty:u.ty});u.rem=0}b.rem=0;b.how=b.refd?'refamt':'split';break}if(s>b.rem+tol)break}}}
-    /* tier 3: on account, oldest bill first */
-    for(const u of free()){for(const b of open()){if(u.rem<=tol)break;const take=Math.min(u.rem,b.rem);b.by.push({d:u.d,vt:u.vt,vno:u.vno,amt:R2(take),how:'fifo',ty:u.ty});b.rem=R2(b.rem-take);u.rem=R2(u.rem-take);
-      if(b.rem<=tol){b.rem=0;b.how=b.how==='adv'||b.refd?'reffifo':'fifo'}else b.how='part'}}
-    for(const b of B){if(b.rem>tol&&b.how!=='part')b.how=b.by.length?'part':'open';bills.push(b)}
-    for(const u of U)if(u.rem>tol)pool.push(u)}
-  /* possible mispostings: an unmatched receipt / payment equal to another party's open bill */
-  const openB=bills.filter(b=>b.rem>tol),mis=[];
-  for(const u of pool){const hit=openB.find(b=>b.party!==u.party&&Math.abs(b.rem-u.rem)<=tol&&Math.abs(dayDiff(u.d,b.d))<=90);if(hit)mis.push({u,b:hit})}
-  const to=S0.to,ageOf=b=>dayDiff(to,b.d),late=[];
-  for(const b of bills){b.days=b.rem<=tol&&b.by.length?Math.max(0,dayDiff(b.by[b.by.length-1].d,b.d)):null;b.cr=b.cp||credit;if(b.days!=null&&b.days>b.cr)late.push(b)}
-  const r={side,credit,bills,pool,allU,opening,over,mis,late,both,to,from:S0.from,parties:Object.keys(parties).length,ageOf};
+  const r=SETTLE.calc({P:S0.P,X:S0.X||[],from:S0.from,to:S0.to},side,{days:+(S0.opt?.[side+'days'])||0});
   if(Object.keys(_stMemo).length>6)_stMemo={};_stMemo[key]=r;return r}
 const pl=(n,one,many)=>n+' '+(n===1?one:many);
-const HOW={ref:['g','Closed by bill reference'],adv:['g','Closed against advance (bill reference)'],refamt:['b','Bill reference, rest by party and amount'],reffifo:['y','Bill reference, rest on account'],
-  amt:['b','Party and amount: one to one'],grp:['b','Party and amount: one receipt, several bills'],split:['b','Party and amount: paid in parts'],fifo:['y','On account, oldest bill first'],part:['y','Part settled'],open:['r','Open']};
-const HOWP={...HOW,grp:['b','Party and amount: one payment, several bills']};
+const HOW={ref:['g','Closed by bill reference'],adv:['g','Closed against advance (bill reference)'],round:['g','Rounding (₹1 or less)'],
+  nar:['b','Narration names the bill'],refnar:['b','Bill reference, rest named in the narration'],
+  amt:['b','Party and amount: one to one'],refamt:['b','Bill reference, rest by party and amount'],
+  grp:['b','Party and amount: one receipt, several bills'],refgrp:['b','Bill reference, rest with other bills'],
+  split:['b','Party and amount: paid in parts'],refsplit:['b','Bill reference, rest paid in parts'],
+  combo:['b','Receipt together with a note or journal (discount, TDS)'],refcombo:['b','Bill reference, rest with a note or journal'],
+  near:['y','Settled with a small difference'],refnear:['y','Bill reference, rest with a small difference'],
+  fifo:['y','On account, oldest bill first'],reffifo:['y','Bill reference, rest on account'],part:['y','Part settled'],open:['r','Open']};
+const HOWP={...HOW,grp:['b','Party and amount: one payment, several bills'],combo:['b','Payment together with a note or journal (TDS, discount)']};
 const BOOK={N:'New Ref',A:'Agst Ref',V:'Advance',O:'On account','':'No bill details'};
 const bookOf=x=>x.x==='over'?'Agst Ref, excess over the bill':BOOK[x.ty]??'No bill details';
 const unKind=u=>u.x==='over'?'over':u.ty==='V'||u.ty==='N'?'adv':'acc';
@@ -107,7 +40,7 @@ function stAgeing(r,asOf,mode){asOf=asOf||r.to;const T=mode==='tally',P={},row=n
   for(const b of r.bills)if(b.d<=asOf){const p=row(b.party),v=T?b.t0:b.rem;p.tally+=b.t0>1?b.t0:0;p.real+=b.rem>1?b.rem:0;p.notReal+=Math.max(0,b.t0-b.rem);if(v>1){p.bill+=v;p.age[ix(dayDiff(asOf,b.d))]+=v;p.n++}}
   for(const u of T?r.allU:r.pool)if(u.d<=asOf){const v=T?u.t0:u.rem;if(v<=1)continue;const p=row(u.party),k=unKind(u);p[k==='adv'?'adv':'acc']+=v;p.age[ix(dayDiff(asOf,u.d))]-=v}
   for(const p of Object.values(P)){for(const k of ['bill','adv','acc','tally','notReal','real'])p[k]=R2(p[k]);p.net=R2(p.bill-p.adv-p.acc);p.age=p.age.map(R2)}return P}
-const tierOf=h=>h==='ref'||h==='adv'?1:h==='amt'||h==='grp'||h==='split'||h==='refamt'?2:h==='fifo'||h==='reffifo'?3:0;
+const tierOf=h=>h==='ref'||h==='adv'||h==='round'?1:h==='fifo'||h==='reffifo'?3:h==='part'||h==='open'||!h?0:2;
 const bucket=n=>n<=30?'0–30':n<=60?'31–60':n<=90?'61–90':n<=180?'91–180':'Over 180';
 function stSummary(r,mk){
   const inM=x=>!mk||x.d.slice(0,7)===mk,B=r.bills.filter(inM),sum=L=>R2(L.reduce((s,b)=>s+b.amt,0)),sumR=L=>R2(L.reduce((s,b)=>s+b.rem,0));
@@ -130,6 +63,15 @@ function stFlags(r){
   if(r.late.length)F.push({k:'late',r:'M',t:S?`${pl(r.late.length,'sales bill','sales bills')} collected after the credit period`:`${pl(r.late.length,'purchase bill','purchase bills')} paid after the credit period`,c:`Average ${Math.round(r.late.reduce((s,b)=>s+b.days,0)/r.late.length)} days against ${r.credit} days allowed. Slowest: `+r.late.slice().sort((a,b)=>b.days-a.days).slice(0,8).map(b=>`${b.party} ${b.ref||b.vno} (${b.days} days)`).join(', '),
     cr:S?'Collections within agreed credit terms.':'Payments within agreed terms; MSME suppliers within 45 days.',e:S?'Working capital blocked; credit risk.':'Interest to MSME suppliers; tax disallowance under s.43B(h).',rec:S?'Review credit limits and follow-up for the slow customers.':'Identify MSME suppliers among these and pay within 45 days.'});
   if(r.opening.length)F.push({k:'open',r:'L',t:`${pl(r.opening.length,W.st,W.sts)} against bills from before this file (${inr(r.opening.reduce((s,x)=>s+x.amt,0))})`,c:'Settle opening bills; agree them to last year\'s outstanding list: '+r.opening.slice(0,10).map(x=>`${x.party} ${x.ref}`).join(', '),cr:'Opening balances agree with the previous year\'s closing outstanding.',e:'Opening outstanding could be misstated.',rec:'Import a file from the start of the year, or check these against the opening bill list.'});
+  const mr=r.bills.filter(b=>b.misref);if(mr.length)F.push({k:'misref',r:'M',t:`${pl(mr.length,W.b+' invoice',W.b+' invoices')} booked against another bill's number in Tally (${inr(R2(mr.reduce((t,b)=>t+b.amt,0)))})`,
+    c:mr.slice(0,10).map(b=>`${b.party}: ${b.kind} ${b.vno} of ${fmtD(b.d)} (${inr(b.amt)}) was entered "Agst Ref ${b.ref}", the number of ${b.kind.toLowerCase()} ${b.misref}`).join('; '),
+    cr:'Each invoice is entered in Tally as a new bill (New Ref) under its own number.',e:'Tally adds the new invoice to the old bill: its outstanding and ageing by bill are wrong, and the old bill looks unpaid for longer.',rec:'Correct the bill-wise details of these invoices to New Ref with their own numbers.'});
+  if(r.elsewhere?.length)F.push({k:'else',r:'M',t:`${pl(r.elsewhere.length,S?'receipt':'payment',W.sts)} booked to another ledger, but the narration names a ${W.p}`,
+    c:r.elsewhere.slice(0,10).map(x=>`${x.kind} ${x.vno} of ${fmtD(x.d)}, ${inr(x.amt)} in "${x.ledger}": narration "${x.nar.slice(0,60)}" names ${x.party}${x.bill?` (equals open bill ${x.bill.ref||x.bill.vno})`:''}`).join('; '),
+    cr:`Money ${S?'received from':'paid to'} a ${W.p} is accounted in that ${W.p}'s ledger.`,e:`The ${W.p}'s balance is overstated and the other ledger is misstated.`,rec:'Check each with the bank statement and move it to the right ledger.'});
+  const nr=r.bills.filter(b=>b.diff&&Math.abs(b.diff)>=1);if(nr.length)F.push({k:'near',r:'L',t:`${pl(nr.length,W.b+' bill',W.bs)} settled with a small difference (${inr(R2(nr.reduce((t,b)=>t+Math.abs(b.diff),0)))} in all)`,
+    c:nr.slice(0,12).map(b=>`${b.party} ${b.ref||b.vno}: ${inr(b.amt)} billed, ${b.diff>0?'short by':'more by'} ${inr(Math.abs(b.diff))}`).join('; '),cr:'Short receipts are written off only with approval; bank charges are booked.',e:'Small differences pile up in party balances.',rec:'Book bank charges or approved write-offs against these bills.'});
+  const tn=(r.tie||[]).filter(x=>Math.abs(x.diff)>1);if(tn.length)F.push({k:'tie',r:'M',t:`${pl(tn.length,'party does','parties do')} not tie back to the books`,c:tn.slice(0,10).map(x=>`${x.party}: difference ${inr(x.diff)}`).join('; '),cr:'Every party\'s movement in the period equals its open bills less unmatched credits.',e:'The analysis of these parties may be incomplete.',rec:'Look at these ledgers in Tally; send the file to support if it persists.'});
   if(r.both.length)F.push({k:'both',r:'L',t:r.both.length===1?'1 party is both a customer and a supplier':`${r.both.length} parties are both customers and suppliers`,c:r.both.slice(0,15).join(', '),cr:'Related transactions with the same party are approved; set-off only with agreement.',e:'Netting can hide balances; related-party risk.',rec:'Check approvals and any set-off agreement; review for related parties.'});
   return F}
 

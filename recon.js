@@ -248,7 +248,7 @@ function onegoPanel(c,d){
    <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B'],['TDS','TDS challans']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-hoitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
    <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-homonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
    ${!c.gstin?'<p class="small"><span class="tag y">GSTIN needed</span> Add the client\'s GSTIN in the client master so 1Go knows which client to download.</p>':''}
-   <div class="row"><button class="btn" data-act="hoStart" ${can&&!(H&&['pending','working'].includes(H.status))?'':'disabled'}>${ic('down')}Get from 1Go</button>${H&&H.link?`<a class="btn ghost" href="${esc(H.link)}">Open 1Go again</a>`:''}${H?`<span class="small"><b>${esc(st)}</b>${H.message?' · '+esc(H.message):''}</span>`:''}</div>
+   <div class="row"><button class="btn" data-act="hoStart" ${can&&!(H&&['pending','working'].includes(H.status)&&!(H.expires_at&&Date.parse(H.expires_at)<Date.now()))?'':'disabled'}>${ic('down')}Get from 1Go</button>${H&&H.link?`<a class="btn ghost" href="${esc(H.link)}">Open 1Go again</a>`:''}${H?`<span class="small"><b>${esc(st)}</b>${H.message?' · '+esc(H.message):''}${hoQuiet(H)}</span>`:''}</div>
    ${H&&H.status==='working'&&H.captcha?capBox(H.captcha):''}
    ${H&&H.status==='pending'?'<p class="small muted" style="margin:6px 0 0">If nothing opens, update 1Go to the latest version (it adds the Smart Auditing link), then click <b>Open 1Go again</b>.</p>':''}</div>`}
 /* the portal's CAPTCHA (or the Income Tax portal's secure access message) of the running 1Go request, typed here (owner, 23 Nov 2026) */
@@ -357,31 +357,40 @@ async function hoStart(c){
   const link='onego://smart-auditing?h='+encodeURIComponent(id)+'&t='+token;
   ui.ho={id,client:c.id,status:'pending',link,message:''};render();
   location.href=link;hoWatch();}
+/* 1Go quiet, or the request ran out: say so plainly instead of waiting on "working" */
+function hoQuiet(H){if(!H||H.status!=='working')return'';const now=Date.now(),up=Date.parse(H.updated_at||0),ex=Date.parse(H.expires_at||0),got=(H.said||[]).length;
+  if(ex&&ex<now)return `<br><span style="color:var(--hi)">This request ended without 1Go finishing it (1Go may have been closed).${got?' The returns already received are kept.':''} Click Get from 1Go to ask again.</span>`;
+  if(up&&now-up>20*60000)return `<br><span class="muted">No news from 1Go for ${Math.round((now-up)/60000)} minutes. The GST portal can take up to 30 minutes to prepare GSTR-1 for a month; keep 1Go open.${got?' Returns received so far are already in.':''}</span>`;return''}
 async function hoWatch(){
   clearTimeout(hoWatch.t);const H=ui.ho;if(!H||mode!=='supa')return;
-  const {data,error}=await sb.from('handoffs').select('status,message,captcha').eq('id',H.id).maybeSingle();
-  if(!error&&data){const n=d=>d&&d.captcha?String(d.captcha.n||'')+(d.captcha.at||''):'',ch=data.status!==H.status||data.message!==H.message||n(data)!==n(H);Object.assign(H,data);
+  const {data,error}=await sb.from('handoffs').select('status,message,captcha,updated_at,expires_at').eq('id',H.id).maybeSingle();
+  if(!error&&data){const n=d=>d&&d.captcha?String(d.captcha.n||'')+(d.captcha.at||''):'';let ch=data.status!==H.status||data.message!==H.message||n(data)!==n(H);Object.assign(H,data);const q=hoQuiet(H);if(q!==H.lastQuiet){H.lastQuiet=q;ch=true}
     if(ch){schedule();if(data.captcha&&document.hidden===false)setTimeout(()=>document.getElementById('hocapin')?.focus(),300)}}
-  if(H.status==='done'||H.status==='failed'){await hoCollect(H);return}
+  if(H.status==='done'||H.status==='failed'){await hoCollect(H,true);return}
   if(H.status==='cancelled')return;
-  hoWatch.t=setTimeout(hoWatch,H.status==='working'?2000:4000)}
-async function hoCollect(H){
-  const c=S.clients.find(x=>x.id===H.client);if(!c||H.collected)return;H.collected=true;
+  /* while 1Go works: take in the returns already sent, every 15 seconds */
+  if(H.status==='working'&&Date.now()-(H.lastTake||0)>15000){H.lastTake=Date.now();hoCollect(H,false)}
+  hoWatch.t=setTimeout(hoWatch,H.status==='working'?3000:4000)}
+/* 25 Nov 2026: what 1Go sends is taken in as it arrives (each return as soon as it is downloaded), and at the end the rest */
+async function hoCollect(H,final=true){
+  const c=S.clients.find(x=>x.id===H.client);if(!c||H.collected||H.taking)return;H.taking=true;H.got=H.got||new Set();H.said=H.said||[];H.errs=H.errs||[];
+  try{
   const {data:parts,error}=await sb.from('handoff_parts').select('id,name,kind,period,data').eq('handoff_id',H.id).order('id');
-  if(error)return toast('Could not read what 1Go sent: '+error.message);
-  const res=[],errs=[];
-  for(const p of parts||[]){try{
+  if(error){if(final)toast('Could not read what 1Go sent: '+error.message);return}
+  const res=[],fresh=(parts||[]).filter(p=>!H.got.has(p.id));
+  for(const p of fresh){H.got.add(p.id);try{
     if(p.kind==='TDS_CHALLANS'){res.push({kind:'chl',rows:(p.data.rows||[]).map(x=>({bsr:String(x.bsr),date:ymdOf(x.date),serial:String(x.serial||''),amount:+x.amount||0,section:x.section||'',minor:x.minor||''}))});continue}
     if(p.kind==='NOTE'||p.kind==='TDS_OTHER')continue;
     let buf,name=p.name;if(p.data.b64){const bin=atob(p.data.b64);buf=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);buf=buf.buffer}else{buf=new TextEncoder().encode(JSON.stringify(p.data.json??p.data)).buffer;if(!/\.json$/i.test(name))name+='.json'}
     const prev=ui.rcMonth;ui.rcMonth=fpToKey(p.period)||p.period||'';const r=await readPortalFile(name,buf,p.kind==='GSTR2B'?'g2b':'');ui.rcMonth=prev;
     for(const x of r)if(!x.period&&x.kind!=='chl')x.period=fpToKey(p.period)||p.period;res.push(...r);
     try{await rcEvidence(c,new File([buf],name),'GST portal data via 1Go')}catch(e){}
-  }catch(e){errs.push(p.name+': '+e.message)}}
-  let said=[];try{said=await putPortal(c,mergeG1(res),'1Go')}catch(e){errs.push(e.message)}
-  const d=rcOpen(c);await put('recons',d.id,{...d,handoffs:[...(d.handoffs||[]),H.id].slice(-50)});
-  H.message=(said.length?'Received: '+said.join(', '):'Nothing usable was received')+(errs.length?'. Problems: '+errs.join('; '):'')+(H.message?' · 1Go: '+H.message:'');
-  toast(said.length?said.length+' sets of data received from 1Go':'1Go sent nothing usable');schedule()}
+  }catch(e){H.errs.push(p.name+': '+e.message)}}
+  if(res.length){try{const said=await putPortal(c,mergeG1(res),'1Go');H.said.push(...said);if(!final)toast('From 1Go: '+said.join(', '))}catch(e){H.errs.push(e.message)}}
+  if(!final){schedule();return}
+  H.collected=true;const d=rcOpen(c);await put('recons',d.id,{...d,handoffs:[...(d.handoffs||[]),H.id].slice(-50)});
+  H.message=(H.said.length?'Received: '+H.said.join(', '):'Nothing usable was received')+(H.errs.length?'. Problems: '+H.errs.join('; '):'')+(H.message?' · 1Go: '+H.message:'');
+  toast(H.said.length?H.said.length+' sets of data received from 1Go':'1Go sent nothing usable');schedule()}finally{H.taking=false}}
 
 /* ---------- actions ---------- */
 const rcCsvRows={

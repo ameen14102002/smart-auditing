@@ -118,9 +118,9 @@ function styleSheet(name,rows,sub){
   const n=Math.max(1,...rows.map(r=>r.length)),head=rows[0]||[],L=colLetter(n-1),inCol=head.map(h=>/management's view|decision|our comments|reviewer's comment/i.test(String(h)));
   const band=(v,s)=>[{v,s},...Array.from({length:n-1},()=>({v:'',s}))];
   const out=[band(name,'title'),band(sub||'','sub'),[],head.map(h=>({v:h,s:'head'}))];
-  for(const r of rows.slice(1)){const row=[];for(let j=0;j<n;j++){const v=r[j]??'';row.push(inCol[j]?{v,s:'in'}:typeof v==='number'?{v,s:'num'}:/^(High|Medium|Low|Act|Look)$/.test(v)?{v,s:{High:'hi',Act:'hi',Medium:'md',Look:'md',Low:'lo'}[v]}:{v,s:'cell'})}out.push(row)}
+  let zi=0;for(const r of rows.slice(1)){const z=(++zi)%2===0,row=[];for(let j=0;j<n;j++){const v=r[j]??'';row.push(inCol[j]?{v,s:'in'}:typeof v==='number'?{v,s:z?'numZ':'num'}:/^(High|Medium|Low|Act|Look)$/.test(v)?{v,s:{High:'hi',Act:'hi',Medium:'md',Look:'md',Low:'lo'}[v]}:{v,s:z?'cellZ':'cell'})}out.push(row)}
   const w=Array.from({length:n},(_,j)=>Math.min(60,Math.max(9,...rows.slice(0,300).map(r=>String(r[j]??'').length+2))));
-  return{name,rows:out,w,freeze:{row:4},merges:['A1:'+L+'1','A2:'+L+'2'],heights:{1:28,2:30,4:32},tab:'FF1F2A5C'}}
+  return{name,rows:out,w,freeze:{row:4},merges:['A1:'+L+'1','A2:'+L+'2'],heights:{1:28,2:30,4:32},tab:'FF1F2A5C',foot:(typeof XS!=='undefined'&&XS.foot)||''}}
 function reportSheet(audits,per,O,title){
   const n=8,L=colLetter(n-1),rows=[],merges=[],heights={},band=(v,s)=>[{v,s},...Array.from({length:n-1},()=>({v:'',s}))];
   const add=(r,h)=>{rows.push(r);if(h)heights[rows.length]=h;return rows.length};
