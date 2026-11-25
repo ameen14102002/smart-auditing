@@ -1,14 +1,15 @@
 /* Smart Auditing — logo, sign-in / create account / password reset, workspace setup, and motion that answers actions. */
 const RECOVERY=/type=recovery/.test(location.hash);
-/* the mark: a ledger page with three rulings and the auditor's tick */
-let _lg=0;function logoSVG(size,o={}){const n=++_lg,small=size<=24;return `<svg class="logo${o.draw?' draw':''}" viewBox="0 0 48 48" width="${size}" height="${size}" role="img" aria-label="Smart Auditing"><defs><linearGradient id="lgb${n}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22397f"/><stop offset="1" stop-color="#0c1a3d"/></linearGradient><linearGradient id="lgt${n}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2fbf83"/><stop offset="1" stop-color="#7ef0bd"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgb${n})"/><rect x=".75" y=".75" width="46.5" height="46.5" rx="11.25" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1.5"/>${small?'':'<path d="M10 34.5h11M10 40h19" stroke="#fff" stroke-opacity=".32" stroke-width="2.6" stroke-linecap="round"/>'}<path class="tick" pathLength="30" d="${small?'M11 24l8 8L37 12':'M10.5 21l7.5 7.5L39 7.5'}" fill="none" stroke="url(#lgt${n})" stroke-width="${small?5.5:4.6}" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
+/* the mark: the real 3D render — magnifier over the ledger — as an app icon.
+   Used everywhere (sidebar, sign-in hero, favicon) so the brand is one image. */
+function logoSVG(size,o={}){return `<span class="logoimg${o.draw?' draw':''}" style="width:${size}px;height:${size}px" role="img" aria-label="Smart Auditing"><img src="logo-3d.png" alt="" width="${size}" height="${size}"><span class="shine"></span></span>`}
 const tickSVG=(c='#4fd39b')=>`<svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="none" stroke="${c}" stroke-opacity=".35" stroke-width="1.5"/><path class="tick" pathLength="20" d="M6.5 11.5l3 3 6-7" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 (function brand(){const b=document.querySelector('.side .brand');if(b)b.innerHTML=`<span class="mark">${logoSVG(34)}</span><span>Smart Auditing<small>Monthly internal audit</small></span>`;
-  const fav=document.createElement('link');fav.rel='icon';fav.href='data:image/svg+xml,'+encodeURIComponent(logoSVG(16).replace('class="logo"','xmlns="http://www.w3.org/2000/svg"'));document.head.appendChild(fav);
+  const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='logo-3d.png';document.head.appendChild(fav);
   const h=document.querySelector('.nav a[data-v="home"]');if(h)h.lastChild.textContent='Dashboard';})();
 
 /* ---------- sign-in, create account, reset ---------- */
-const DL=[.9,1.3,1.7,2.65,3.05,3.45],TOT=3.9;
+const DL=[.45,.7,.95,1.5,1.8,2.1],TOT=2.4;
 const ledgerArt=()=>{const F='font-family="IBM Plex Sans,sans-serif"',SF='font-family="IBM Plex Serif,Georgia,serif" font-style="italic"';
  const rows=[['03 Apr','Gujarat Dyes · bill 4471','1,18,000','v'],['05 Apr','GST · March return','21,240','b'],['08 Apr','Rent · April','45,000','q'],['11 Apr','TDS 194C deposit','2,360','b'],['14 Apr','Bank charges','590','b'],['18 Apr','Kumar Transport · LR 882','36,580','v']];
  const tk=(x,y,d)=>`<path class="tick" pathLength="20" d="M${x} ${y}l4 4 9-10" fill="none" stroke="#17875a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:${d}s"/>`;
@@ -41,15 +42,17 @@ const ledgerArt=()=>{const F='font-family="IBM Plex Sans,sans-serif"',SF='font-f
  </svg>`};
 
 let _drawn=false;
-function authBrand(){const d=!_drawn;_drawn=true;return `<section class="auth-brand${d?' draw':''}">${logoSVG(64,{draw:d})}
-  <h1>Monthly internal audits, from the books to a signed report.</h1>
-  <p class="lede">One place for every client's audit plan, procedures, observations and reports.</p>
-  <ul><li>${tickSVG()}<span>Vouching, GST, TDS and bank reconciliations matched from the client's books</span></li><li>${tickSVG()}<span>An observation report after every client visit</span></li><li>${tickSVG()}<span>The month's internal audit report, built from those visits</span></li></ul>
+function authBrand(){let seen=false;try{seen=!!localStorage.getItem('sa-auth-seen')}catch(e){}
+  const d=!_drawn&&!seen;_drawn=true;if(d){try{localStorage.setItem('sa-auth-seen','1')}catch(e){}}
+  return `<section class="auth-brand${d?' draw':''}"><div class="brandrow">${logoSVG(56,{draw:d})}<span class="wordmark">Smart Auditing<small>Internal audit workbench</small></span></div>
+  <h1>Find it. Prove it. Fix it. Re-test it.</h1>
+  <p class="lede">The internal audit workbench for CA firms — every client, every month, from plan to signed report.</p>
+  <ul><li>${tickSVG()}<span>Vouch, reconcile and analyse the books — GST, TDS, bank and ledgers tied back to source</span></li><li>${tickSVG()}<span>Raise observations with evidence, agree the reply with management, track to closure</span></li><li>${tickSVG()}<span>Re-test rectification and carry open items into next month's report</span></li></ul>
   <div class="auth-stage">${ledgerArt()}
    <div class="chip c1"><i style="background:#17875a"></i><span><b>Bank reconciliation</b>Difference ₹0 · agreed to statement</span></div>
    <div class="chip c2"><i style="background:#c93a2e"></i><span><b>Observation raised · High</b>Rent paid without a lease</span></div>
    <div class="chip c3"><i style="background:#2f4bd8"></i><span><b>Visit 3 of 4</b>Observation report ready</span></div></div>
-  <p class="foot">Part of 1Go. Opening Smart Auditing from its tile in 1Go signs you in with your 1Go account.</p></section>`}
+  <p class="foot">Part of the 1Go suite · Your firm's data stays in your workspace</p></section>`}
 const pwField=(id,ac,label,extra='')=>`<div class="fld"><label for="${id}">${label}</label><div class="in"><input id="${id}" type="password" autocomplete="${ac}" minlength="8" required style="padding-right:64px"><button type="button" class="show" data-show="${id}" aria-label="Show password" aria-pressed="false">Show</button></div>${extra}</div>`;
 vLogin=function(){
   const m=RECOVERY&&session?'reset2':ui.authMode||'in';
