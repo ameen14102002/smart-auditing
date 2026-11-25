@@ -27,8 +27,8 @@ jobs:
           mkdir -p _site
           cp index.html styles.css logic.js ui.js vouching.js recon.js procs.js follow.js quality.js more.js visits.js settle-engine.js settle.js export.js xlsxsa.js gstengine.js gstlink.js report-xlsx.js design.js design.css .nojekyll _site/
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
