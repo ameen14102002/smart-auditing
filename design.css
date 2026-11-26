@@ -24,8 +24,7 @@ table,.num,.kpi b,.tag,input[type=number]{font-variant-numeric:tabular-nums lini
 .side{background:var(--rail)}.app{background:linear-gradient(to right,var(--rail) 240px,transparent 240px)}
 
 /* the logo: the real 3D render as an app icon — scales in with a shine sweep, once on first sign-in */
-.logoimg{position:relative;display:inline-block;border-radius:22%;overflow:hidden;box-shadow:0 6px 18px rgb(3 10 30 / .35),0 0 0 1px rgb(255 255 255 / .12);flex:none}
-.logoimg img{width:100%;height:100%;object-fit:cover;display:block}
+.logoimg{position:relative;display:inline-block;border-radius:22%;overflow:hidden;box-shadow:0 6px 18px rgb(3 10 30 / .35),0 0 0 1px rgb(255 255 255 / .12);flex:none;background:url(logo-3d.png?v=3) center/cover no-repeat}
 .logoimg .shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgb(255 255 255 / .5) 50%,transparent 70%);transform:translateX(-130%);pointer-events:none}
 .logoimg.draw{animation:logoIn .6s var(--ease) .1s both}
 .logoimg.draw .shine{animation:sweep .9s var(--ease) .5s both}
@@ -86,6 +85,54 @@ body.auth #main{padding:0;max-width:none}
 @keyframes beamsweep{from{background-position:130% 0,0 0,center}to{background-position:-30% 0,0 0,center}}
 @keyframes glowdrift{from{transform:translate3d(0,0,0) scale(1);opacity:.45}to{transform:translate3d(-6%,4%,0) scale(1.1);opacity:.95}}
 @keyframes dustrise{from{background-position:0 0,0 0,0 0}to{background-position:0 0,0 0,0 -72px}}
+/* ---------- opening intro: book → search → logo → wording → card ---------- */
+.auth-wrap.intro .brandrow .logoimg,.auth-wrap.intro .wordmark,.auth-wrap.intro .auth-brand h1,
+.auth-wrap.intro .lede,.auth-wrap.intro .auth-brand ul,.auth-wrap.intro .foot{opacity:0}
+.auth-wrap.intro .auth-card{opacity:0;transform:translateY(110%)}
+.auth-wrap.intro .auth-form{pointer-events:none}
+.auth-wrap.intro .auth-brand::before{opacity:0}
+.auth-wrap.intro.st-words .auth-brand::before{opacity:1;transition:opacity .6s ease .9s}
+.auth-wrap.intro.st-landed .brandrow .logoimg{opacity:1;transition:opacity .25s ease}
+.auth-wrap.intro.st-words .wordmark{animation:fadeLeft .6s ease both}
+.auth-wrap.intro.st-words .auth-brand h1{opacity:1}
+.auth-wrap.intro.st-words .auth-brand h1 .w{display:inline-block;opacity:0;animation:wordUp .6s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(.35s + var(--i,0)*.13s)}
+.auth-wrap.intro.st-words .lede{animation:fadeUp .6s ease both;animation-delay:1.7s}
+.auth-wrap.intro.st-words .auth-brand li{opacity:0;animation:fadeUp .55s ease both}
+.auth-wrap.intro.st-words .auth-brand li:nth-child(1){animation-delay:2s}
+.auth-wrap.intro.st-words .auth-brand li:nth-child(2){animation-delay:2.2s}
+.auth-wrap.intro.st-words .auth-brand li:nth-child(3){animation-delay:2.4s}
+.auth-wrap.intro.st-words .foot{animation:fadeUp .6s ease both;animation-delay:2.8s}
+.auth-wrap.intro.st-card .auth-card{opacity:1;transform:translateY(0);transition:transform .95s cubic-bezier(.16,1,.3,1),opacity .45s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fadeLeft{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
+@keyframes wordUp{from{opacity:0;transform:translateY(.55em)}to{opacity:1;transform:none}}
+#intro-fx{position:absolute;inset:0;z-index:50;pointer-events:none;overflow:hidden}
+#intro-fx .i-book{position:absolute;left:50%;top:46%;width:min(300px,68vw);transform:translate(-50%,-50%) scale(.6);opacity:0;transition:opacity .55s ease,transform .75s cubic-bezier(.34,1.45,.64,1)}
+.auth-wrap.intro.st-book #intro-fx .i-book{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.auth-wrap.intro.st-logo #intro-fx .i-book{opacity:0;transform:translate(-50%,-50%) scale(1.08);transition:opacity .5s ease,transform .5s ease}
+#intro-fx .i-book svg{width:100%;height:auto;display:block;filter:drop-shadow(0 20px 34px rgb(0 0 0/.45))}
+#intro-fx .i-mag{position:absolute;left:50%;top:46%;width:min(180px,44vw);transform:translate(-50%,-50%) translateY(-140px);opacity:0;transition:opacity .4s ease,transform .55s cubic-bezier(.34,1.4,.64,1)}
+.auth-wrap.intro.st-mag #intro-fx .i-mag{opacity:1;transform:translate(-50%,-50%) translateY(0)}
+.auth-wrap.intro.st-search #intro-fx .i-mag{animation:magSearch 3s ease-in-out both}
+.auth-wrap.intro.st-logo #intro-fx .i-mag{opacity:0;transform:translate(-50%,-50%) scale(1.12);transition:opacity .45s ease,transform .45s ease;animation:none}
+#intro-fx .i-mag svg{width:100%;height:100%;display:block;filter:drop-shadow(0 16px 26px rgb(0 0 0/.5))}
+@keyframes magSearch{
+  0%{transform:translate(-50%,-50%) translateX(-80px) rotate(-9deg)}
+  20%{transform:translate(-50%,-50%) translateX(80px) rotate(9deg)}
+  40%{transform:translate(-50%,-50%) translateX(-80px) rotate(-9deg)}
+  60%{transform:translate(-50%,-50%) translateX(80px) rotate(9deg)}
+  80%{transform:translate(-50%,-50%) translateX(-45px) rotate(-5deg)}
+  100%{transform:translate(-50%,-50%) translateX(0) rotate(0)}
+}
+#intro-fx .i-logo{position:absolute;left:50%;top:46%;width:min(320px,70vw);height:min(320px,70vw);transform:translate(-50%,-50%);opacity:0;border-radius:22%;overflow:hidden;box-shadow:0 6px 18px rgb(3 10 30/.35),0 0 0 1px rgb(255 255 255/.12);transition:opacity .55s ease,transform 1.35s cubic-bezier(.65,0,.35,1)}
+.auth-wrap.intro.st-logo #intro-fx .i-logo{opacity:1}
+.auth-wrap.intro.st-fly #intro-fx .i-logo{transition:opacity .55s ease,transform 1.35s cubic-bezier(.65,0,.35,1)}
+#intro-fx .i-logo img{width:100%;height:100%;object-fit:cover;display:block}
+#intro-fx .i-shine{position:absolute;left:50%;top:46%;width:min(320px,70vw);height:min(320px,70vw);transform:translate(-50%,-50%);border-radius:22%;overflow:hidden;pointer-events:none;opacity:0}
+#intro-fx .i-shine::after{content:"";position:absolute;top:-20%;bottom:-20%;width:45%;left:-70%;background:linear-gradient(105deg,transparent,rgb(255 255 255/.6),transparent);transform:skewX(-16deg)}
+.auth-wrap.intro.st-logo #intro-fx .i-shine{opacity:1}
+.auth-wrap.intro.st-logo #intro-fx .i-shine::after{animation:shineGo 1s cubic-bezier(.4,0,.2,1) .15s both}
+@keyframes shineGo{to{left:130%}}
 .auth-brand{background:transparent;color:#dfe6fb;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden}
 .auth-brand::before{content:"";position:absolute;top:0;bottom:0;left:38px;width:1px;background:rgb(201 58 46 / .45)}
 .auth-brand .logoimg{position:relative}
