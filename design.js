@@ -4,9 +4,15 @@ const RECOVERY=/type=recovery/.test(location.hash);
    Used everywhere (sidebar, sign-in hero, favicon) so the brand is one image. */
 function logoSVG(size,o={}){return `<span class="logoimg${o.draw?' draw':''}" style="width:${size}px;height:${size}px" role="img" aria-label="Smart Auditing"><span class="shine"></span></span>`}
 const tickSVG=(c='#4fd39b')=>`<svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="none" stroke="${c}" stroke-opacity=".35" stroke-width="1.5"/><path class="tick" pathLength="20" d="M6.5 11.5l3 3 6-7" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-(function brand(){const b=document.querySelector('.side .brand');if(b)b.innerHTML=`<span class="mark">${logoSVG(34)}</span><span>Smart Auditing<small>Monthly internal audit</small></span>`;
+(function brand(){const b=document.querySelector('.side .brand');if(b){b.innerHTML=`<span class="mark">${logoSVG(34)}</span><span>Smart Auditing<small>Monthly internal audit</small></span>`;b.title='Go to dashboard';b.addEventListener('click',e=>{if(!e.target.closest('a,button'))location.hash='#home'});}
   const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='logo-3d.png?v=3';document.head.appendChild(fav);
   const h=document.querySelector('.nav a[data-v="home"]');if(h)h.lastChild.textContent='Dashboard';})();
+/* one quiet shine on the sidebar mark the first time the app shell shows this session */
+let _sideShineDone=false;function sideMarkShine(){let seen=false;try{seen=sessionStorage.getItem('sa-side-shine')==='1'}catch(e){}
+  if(seen||document.body.classList.contains('auth'))return;
+  try{sessionStorage.setItem('sa-side-shine','1')}catch(e){}
+  const m=document.querySelector('.side .brand .logoimg');if(!m)return;
+  m.classList.add('draw');setTimeout(()=>m.classList.remove('draw'),1600);}
 
 /* ---------- sign-in, create account, reset ---------- */
 const DL=[.45,.7,.95,1.5,1.8,2.1],TOT=2.4;
@@ -154,6 +160,7 @@ const _render0=render;let _lastView='';
 render=function(){_render0();
   if(document.querySelector('.auth-brand.draw .pen:not(.ran)')){const p=document.querySelector('.auth-brand.draw .pen');p.classList.add('ran');penRun()}
   const auth=(mode==='supa'&&(mustSignIn||!session||!ws||(RECOVERY&&session)));document.body.classList.toggle('auth',!!auth);
+  if(!auth&&!_sideShineDone){_sideShineDone=true;setTimeout(sideMarkShine,450)}
   if(RECOVERY&&session&&mode==='supa'){document.getElementById('main').innerHTML=vLogin()}
   const m=document.getElementById('main'),key=ui.view+'|'+ui.id+'|'+(ui.atab||'')+'|'+(ui.ctab||'');if(key!==_lastView){m.classList.remove('enter');void m.offsetWidth;m.classList.add('enter');_lastView=key}
   for(const b of document.querySelectorAll('.seg button.ok.on'))if(!b.querySelector('.tk'))b.insertAdjacentHTML('afterbegin','<svg class="tk" viewBox="0 0 14 14" aria-hidden="true"><path pathLength="20" d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
