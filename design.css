@@ -110,12 +110,12 @@ body.auth #main{padding:0;max-width:none}
 #intro-fx .i-book{position:absolute;left:50%;top:46%;width:min(300px,68vw);transform:translate(-50%,-50%) scale(.6);opacity:0;transition:opacity .55s ease,transform .75s cubic-bezier(.34,1.45,.64,1)}
 .auth-wrap.intro.st-book #intro-fx .i-book{opacity:1;transform:translate(-50%,-50%) scale(1)}
 .auth-wrap.intro.st-logo #intro-fx .i-book{opacity:0;transform:translate(-50%,-50%) scale(1.08);transition:opacity .5s ease,transform .5s ease}
-#intro-fx .i-book svg{width:100%;height:auto;display:block;filter:drop-shadow(0 20px 34px rgb(0 0 0/.45))}
+#intro-fx .i-book img{width:100%;height:auto;display:block;filter:drop-shadow(0 20px 34px rgb(0 0 0/.45))}
 #intro-fx .i-mag{position:absolute;left:50%;top:46%;width:min(180px,44vw);transform:translate(-50%,-50%) translateY(-140px);opacity:0;transition:opacity .4s ease,transform .55s cubic-bezier(.34,1.4,.64,1)}
 .auth-wrap.intro.st-mag #intro-fx .i-mag{opacity:1;transform:translate(-50%,-50%) translateY(0)}
 .auth-wrap.intro.st-search #intro-fx .i-mag{animation:magSearch 3s ease-in-out both}
 .auth-wrap.intro.st-logo #intro-fx .i-mag{opacity:0;transform:translate(-50%,-50%) scale(1.12);transition:opacity .45s ease,transform .45s ease;animation:none}
-#intro-fx .i-mag svg{width:100%;height:100%;display:block;filter:drop-shadow(0 16px 26px rgb(0 0 0/.5))}
+#intro-fx .i-mag img{width:100%;height:auto;display:block;filter:drop-shadow(0 16px 26px rgb(0 0 0/.5))}
 @keyframes magSearch{
   0%{transform:translate(-50%,-50%) translateX(-80px) rotate(-9deg)}
   20%{transform:translate(-50%,-50%) translateX(80px) rotate(9deg)}
