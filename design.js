@@ -101,8 +101,8 @@ function penRun(){const svg=document.querySelector('.auth-brand.draw .auth-art')
 document.addEventListener('pointermove',e=>{const st=document.querySelector('.auth-stage');if(!st||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const r=st.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;st.style.setProperty('--rx',(-y*4).toFixed(2)+'deg');st.style.setProperty('--ry',(x*6).toFixed(2)+'deg')});
 /* ---------- opening intro: book → search → logo → wording → card ---------- */
 try{if(new URLSearchParams(location.search).get('intro')==='1'){sessionStorage.removeItem('sa-intro-seen');localStorage.removeItem('sa-auth-seen')}}catch(e){}
-const INTRO_SVG_BOOK=`<svg viewBox="0 0 120 96" aria-hidden="true"><rect x="6" y="8" width="96" height="80" rx="7" fill="#16233f" stroke="#c9a44a" stroke-width="3"/><rect x="96" y="13" width="9" height="70" rx="2" fill="#dab96a"/><g stroke="#c9a44a" stroke-width="1.5" opacity=".85"><line x1="18" y1="32" x2="88" y2="32"/><line x1="18" y1="52" x2="88" y2="52"/><line x1="18" y1="72" x2="88" y2="72"/><line x1="42" y1="16" x2="42" y2="84"/><line x1="66" y1="16" x2="66" y2="84"/></g><rect x="13" y="14" width="76" height="68" rx="4" fill="none" stroke="#c9a44a" stroke-width="1" opacity=".55"/></svg>`;
-const INTRO_SVG_MAG=`<svg viewBox="0 0 100 100" aria-hidden="true"><line x1="58" y1="58" x2="90" y2="90" stroke="#1f5c3f" stroke-width="13" stroke-linecap="round"/><line x1="58" y1="58" x2="90" y2="90" stroke="#174d34" stroke-width="6" stroke-linecap="round"/><circle cx="44" cy="44" r="31" fill="rgba(168,205,255,.28)" stroke="#c9a44a" stroke-width="8"/><circle cx="44" cy="44" r="26" fill="none" stroke="#e8ce8c" stroke-width="1.5" opacity=".6"/><path d="M30 40 Q38 29 53 34" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round" opacity=".75"/></svg>`;
+const INTRO_BOOK_IMG=`<img src="intro-book.png?v=1" alt="" draggable="false">`;
+const INTRO_MAG_IMG=`<img src="intro-mag.png?v=1" alt="" draggable="false">`;
 let _introTimers=[],_introSkip=null;
 function finishIntro(){
   _introTimers.forEach(clearTimeout);_introTimers=[];
@@ -124,7 +124,7 @@ function startIntro(){
   }
   const fx=document.createElement('div');
   fx.id='intro-fx';
-  fx.innerHTML=`<div class="i-book">${INTRO_SVG_BOOK}</div><div class="i-mag">${INTRO_SVG_MAG}</div><div class="i-logo"><img src="logo-3d.png?v=3" alt=""></div><div class="i-shine"></div>`;
+  fx.innerHTML=`<div class="i-book">${INTRO_BOOK_IMG}</div><div class="i-mag">${INTRO_MAG_IMG}</div><div class="i-logo"><img src="logo-3d.png?v=3" alt=""></div><div class="i-shine"></div>`;
   wrap.appendChild(fx);
   wrap.classList.add('intro');
   const at=(ms,fn)=>_introTimers.push(setTimeout(()=>{if(wrap.isConnected&&wrap.classList.contains('intro'))fn()},ms));
