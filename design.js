@@ -2,10 +2,10 @@
 const RECOVERY=/type=recovery/.test(location.hash);
 /* the mark: the real 3D render — magnifier over the ledger — as an app icon.
    Used everywhere (sidebar, sign-in hero, favicon) so the brand is one image. */
-function logoSVG(size,o={}){return `<span class="logoimg${o.draw?' draw':''}" style="width:${size}px;height:${size}px" role="img" aria-label="Smart Auditing"><img src="logo-3d.png?v=2" alt="" width="${size}" height="${size}"><span class="shine"></span></span>`}
+function logoSVG(size,o={}){return `<span class="logoimg${o.draw?' draw':''}" style="width:${size}px;height:${size}px" role="img" aria-label="Smart Auditing"><span class="shine"></span></span>`}
 const tickSVG=(c='#4fd39b')=>`<svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="none" stroke="${c}" stroke-opacity=".35" stroke-width="1.5"/><path class="tick" pathLength="20" d="M6.5 11.5l3 3 6-7" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 (function brand(){const b=document.querySelector('.side .brand');if(b)b.innerHTML=`<span class="mark">${logoSVG(34)}</span><span>Smart Auditing<small>Monthly internal audit</small></span>`;
-  const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='logo-3d.png?v=2';document.head.appendChild(fav);
+  const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='logo-3d.png?v=3';document.head.appendChild(fav);
   const h=document.querySelector('.nav a[data-v="home"]');if(h)h.lastChild.textContent='Dashboard';})();
 
 /* ---------- sign-in, create account, reset ---------- */
@@ -42,8 +42,14 @@ const ledgerArt=()=>{const F='font-family="IBM Plex Sans,sans-serif"',SF='font-f
  </svg>`};
 
 let _drawn=false;
+function introShouldPlay(){try{
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
+  if(sessionStorage.getItem('sa-intro-seen'))return false;
+  return true;
+}catch(e){return false}}
 function authBrand(){let seen=false;try{seen=!!localStorage.getItem('sa-auth-seen')}catch(e){}
-  const d=!_drawn&&!seen;_drawn=true;if(d){try{localStorage.setItem('sa-auth-seen','1')}catch(e){}}
+  const willIntro=introShouldPlay();
+  const d=!willIntro&&!_drawn&&!seen;_drawn=true;if(d){try{localStorage.setItem('sa-auth-seen','1')}catch(e){}}
   return `<section class="auth-brand${d?' draw':''}"><div class="brandrow">${logoSVG(56,{draw:d})}<span class="wordmark">Smart Auditing<small>Internal audit workbench</small></span></div>
   <h1>From audit planning to the signed report.</h1>
   <p class="lede">The internal audit workbench for CA firms — every client, every month, with evidence behind every finding.</p>
@@ -93,6 +99,56 @@ function penRun(){const svg=document.querySelector('.auth-brand.draw .auth-art')
   k.push({t:TOT-.05,x:352,y:y0+6*h+2,o:1},{t:TOT+.15,x:362,y:y0+6*h-6,o:1},{t:4.5,x:470,y:y0+6*h+60,o:0});
   pen.animate(k.map(p=>({offset:Math.min(1,p.t/T),transform:`translate(${p.x}px,${p.y}px)`,opacity:p.o})),{duration:T*1000,easing:'linear',fill:'both'})}
 document.addEventListener('pointermove',e=>{const st=document.querySelector('.auth-stage');if(!st||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const r=st.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;st.style.setProperty('--rx',(-y*4).toFixed(2)+'deg');st.style.setProperty('--ry',(x*6).toFixed(2)+'deg')});
+/* ---------- opening intro: book → search → logo → wording → card ---------- */
+try{if(new URLSearchParams(location.search).get('intro')==='1'){sessionStorage.removeItem('sa-intro-seen');localStorage.removeItem('sa-auth-seen')}}catch(e){}
+const INTRO_SVG_BOOK=`<svg viewBox="0 0 120 96" aria-hidden="true"><rect x="6" y="8" width="96" height="80" rx="7" fill="#16233f" stroke="#c9a44a" stroke-width="3"/><rect x="96" y="13" width="9" height="70" rx="2" fill="#dab96a"/><g stroke="#c9a44a" stroke-width="1.5" opacity=".85"><line x1="18" y1="32" x2="88" y2="32"/><line x1="18" y1="52" x2="88" y2="52"/><line x1="18" y1="72" x2="88" y2="72"/><line x1="42" y1="16" x2="42" y2="84"/><line x1="66" y1="16" x2="66" y2="84"/></g><rect x="13" y="14" width="76" height="68" rx="4" fill="none" stroke="#c9a44a" stroke-width="1" opacity=".55"/></svg>`;
+const INTRO_SVG_MAG=`<svg viewBox="0 0 100 100" aria-hidden="true"><line x1="58" y1="58" x2="90" y2="90" stroke="#1f5c3f" stroke-width="13" stroke-linecap="round"/><line x1="58" y1="58" x2="90" y2="90" stroke="#174d34" stroke-width="6" stroke-linecap="round"/><circle cx="44" cy="44" r="31" fill="rgba(168,205,255,.28)" stroke="#c9a44a" stroke-width="8"/><circle cx="44" cy="44" r="26" fill="none" stroke="#e8ce8c" stroke-width="1.5" opacity=".6"/><path d="M30 40 Q38 29 53 34" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round" opacity=".75"/></svg>`;
+let _introTimers=[],_introSkip=null;
+function finishIntro(){
+  _introTimers.forEach(clearTimeout);_introTimers=[];
+  if(_introSkip){document.removeEventListener('click',_introSkip);document.removeEventListener('keydown',_introSkip);_introSkip=null}
+  const wrap=document.querySelector('.auth-wrap.intro');
+  try{sessionStorage.setItem('sa-intro-seen','1');localStorage.setItem('sa-auth-seen','1')}catch(e){}
+  if(!wrap)return;
+  wrap.classList.remove('intro','st-book','st-mag','st-search','st-logo','st-fly','st-landed','st-words','st-card');
+  delete wrap.dataset.intro;
+  const fx=document.getElementById('intro-fx');if(fx)fx.remove();
+}
+function startIntro(){
+  const wrap=document.querySelector('.auth-wrap');
+  if(!wrap||wrap.dataset.intro==='1'||!introShouldPlay())return;
+  wrap.dataset.intro='1';
+  const h1=wrap.querySelector('.auth-brand h1');
+  if(h1&&!h1.querySelector('.w')){
+    h1.innerHTML=h1.textContent.trim().split(/\s+/).map((w,i)=>`<span class="w" style="--i:${i}">${w}</span>`).join(' ');
+  }
+  const fx=document.createElement('div');
+  fx.id='intro-fx';
+  fx.innerHTML=`<div class="i-book">${INTRO_SVG_BOOK}</div><div class="i-mag">${INTRO_SVG_MAG}</div><div class="i-logo"><img src="logo-3d.png?v=3" alt=""></div><div class="i-shine"></div>`;
+  wrap.appendChild(fx);
+  wrap.classList.add('intro');
+  const at=(ms,fn)=>_introTimers.push(setTimeout(()=>{if(wrap.isConnected&&wrap.classList.contains('intro'))fn()},ms));
+  _introSkip=()=>finishIntro();
+  document.addEventListener('click',_introSkip);
+  document.addEventListener('keydown',_introSkip);
+  at(80,()=>wrap.classList.add('st-book'));
+  at(1500,()=>wrap.classList.add('st-mag'));
+  at(2200,()=>wrap.classList.add('st-search'));
+  at(5300,()=>wrap.classList.add('st-logo'));
+  at(6500,()=>{
+    wrap.classList.add('st-fly');
+    const logo=fx.querySelector('.i-logo'),target=wrap.querySelector('.brandrow .logoimg');
+    if(!logo||!target)return;
+    const from=logo.getBoundingClientRect(),to=target.getBoundingClientRect();
+    const dx=(to.left+to.width/2)-(from.left+from.width/2);
+    const dy=(to.top+to.height/2)-(from.top+from.height/2);
+    const s=to.width/Math.max(1,from.width);
+    logo.style.transform=`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) translate(-50%,-50%) scale(${s.toFixed(4)})`;
+  });
+  at(7900,()=>{wrap.classList.add('st-landed');wrap.classList.add('st-words');_introTimers.push(setTimeout(()=>{const f=document.getElementById('intro-fx');if(f)f.remove()},450))});
+  at(11400,()=>wrap.classList.add('st-card'));
+  at(12600,()=>finishIntro());
+}
 /* ---------- after every render: auth layout, view fade, ticks ---------- */
 const _render0=render;let _lastView='';
 render=function(){_render0();
@@ -103,7 +159,8 @@ render=function(){_render0();
   for(const b of document.querySelectorAll('.seg button.ok.on'))if(!b.querySelector('.tk'))b.insertAdjacentHTML('afterbegin','<svg class="tk" viewBox="0 0 14 14" aria-hidden="true"><path pathLength="20" d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   for(const t of document.querySelectorAll('.tabs')){const on=t.querySelector('button.on');let ind=t.querySelector('.ind');if(!on){ind&&ind.remove();continue}if(!ind){ind=document.createElement('span');ind.className='ind';t.appendChild(ind);ind.style.transition='none'}const prev=t.dataset.k===t.textContent.length+'';if(!prev)ind.style.transition='none';ind.style.left=on.offsetLeft+'px';ind.style.width=on.offsetWidth+'px';t.dataset.k=t.textContent.length;if(!prev){void ind.offsetWidth;ind.style.transition=''}}
   if(ui.justTick!=null){const b=document.querySelector(`.seg button.ok.on[data-i="${ui.justTick}"]`);if(b)b.classList.add('just');ui.justTick=null}
-  if(ui.justReady){for(const t of document.querySelectorAll('.tag.g'))if(/Ready to report/.test(t.textContent))t.classList.add('pop');ui.justReady=false}};
+  if(ui.justReady){for(const t of document.querySelectorAll('.tag.g'))if(/Ready to report/.test(t.textContent))t.classList.add('pop');ui.justReady=false}
+  if(auth&&introShouldPlay())setTimeout(startIntro,60)};
 const _res=ACT.res;ACT.res=t=>{const a=A(),i=+t.dataset.i;if(t.dataset.v==='ok'&&a.items[i].r!=='ok')ui.justTick=i;
   const before=typeof progStatus==='function'?progStatus(a,S.clients.find(c=>c.id===a.clientId)).done:false;_res(t);
   setTimeout(()=>{const b=A();if(b&&typeof progStatus==='function'&&!before&&progStatus(b,S.clients.find(c=>c.id===b.clientId)).done){ui.justReady=true;render()}},60)};
