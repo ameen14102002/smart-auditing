@@ -240,28 +240,19 @@ const rcState=s=>s==='ok'?'<span class="tag g">Reconciled</span>':s==='bad'?'<sp
 const sgn=n=>n==null?'<span class="muted">—</span>':`<span class="num" style="${Math.abs(n)>RTOL?'color:var(--hi);font-weight:600':''}">${n<0?'−':''}${inr(Math.abs(R2(n)))}</span>`;
 function rcCoverage(d){const fm=fyMonths(d.fy),has=(s,m)=>s==='bS'||s==='bP'?!!d[s]?.months?.[m]:s==='tB'?(d.tB?.rows||[]).some(x=>x.m===m):s==='chl'?(d.chl?.rows||[]).some(x=>String(x.date).slice(0,7)===m):!!d[s]?.[m];
   return `<div class="scroll"><table class="cov"><thead><tr><th>Source</th>${fm.map(m=>`<th class="num">${mLabel(m)}</th>`).join('')}</tr></thead><tbody>${Object.entries(RSRC).map(([s,l])=>`<tr><td>${l}</td>${fm.map(m=>`<td class="num">${has(s,m)?'<span style="color:var(--ok)">●</span>':'<span class="muted">·</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
-function onegoPanel(c,d){
-  const can=mode==='supa',fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),H=ui.ho&&ui.ho.client===c.id?ui.ho:null,sel=ui.hoSel||{items:['GSTR1','GSTR2B','GSTR3B','TDS'],months:def.length?def:fm.slice(0,1)};
-  const st=H?({pending:'Waiting for 1Go to open…',working:'1Go is downloading from the portals…',done:'Done',failed:'1Go could not finish',cancelled:'Cancelled'}[H.status]||H.status):'';
-  return `<div class="panel"><h3>${ic('down')}Get from 1Go</h3><p class="small muted" style="margin:-4px 0 8px">1Go signs in to the GST and Income Tax portals on your computer (you type the CAPTCHA here), downloads the returns and challans, and sends them here. All matching is done in Smart Auditing; 1Go files nothing.</p>
-   ${can?'':'<p class="small"><span class="tag y">Needs the online version</span> This copy of Smart Auditing is not connected to your workspace, so 1Go cannot send data into it. Open it from the <b>Smart Auditing</b> tile in 1Go (it signs you in with your 1Go account), or at <a href="https://ameen14102002.github.io/smart-auditing/" target="_blank" rel="noopener">ameen14102002.github.io/smart-auditing</a>.</p>'}
-   <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B'],['TDS','TDS challans']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-hoitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
-   <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-homonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
-   ${!c.gstin?'<p class="small"><span class="tag y">GSTIN needed</span> Add the client\'s GSTIN in the client master so 1Go knows which client to download.</p>':''}
-   <div class="row"><button class="btn" data-act="hoStart" ${can&&!(H&&['pending','working'].includes(H.status)&&!(H.expires_at&&Date.parse(H.expires_at)<Date.now()))?'':'disabled'}>${ic('down')}Get from 1Go</button>${H&&H.link?`<a class="btn ghost" href="${esc(H.link)}">Open 1Go again</a>`:''}${H?`<span class="small"><b>${esc(st)}</b>${H.message?' · '+esc(H.message):''}${hoQuiet(H)}</span>`:''}</div>
-   ${H&&H.status==='working'&&H.captcha?capBox(H.captcha):''}
-   ${H&&H.status==='pending'?'<p class="small muted" style="margin:6px 0 0">If nothing opens, update 1Go to the latest version (it adds the Smart Auditing link), then click <b>Open 1Go again</b>.</p>':''}</div>`}
-/* the portal's CAPTCHA (or the Income Tax portal's secure access message) of the running 1Go request, typed here (owner, 23 Nov 2026) */
-function capBox(k){const it=k.portal==='ittan';
-  return `<div class="panel" style="margin-top:10px;border:2px solid var(--accent,#2b6cb0)"><h3>${it?'Income Tax portal':'GST portal'} sign-in for 1Go</h3>
-   ${k.kind==='secure'?`<p class="small">Your secure access message on the portal:</p><p style="font-size:16px;font-weight:700;text-align:center;border:1px solid var(--line,#ccd);border-radius:8px;padding:8px">${esc(k.text||'')}</p><p class="small muted">Click only if this is the message you set on the portal.</p><div class="row"><button class="btn" data-act="hoCap" data-v="YES">Yes, it is mine: sign in</button></div>`
-   :`${k.retry?'<p class="small"><span class="tag r">Not accepted</span> That CAPTCHA was wrong. Type this new one.</p>':'<p class="small muted">Type the characters you see. 1Go signs in on your computer and downloads in the background.</p>'}
-   <img alt="CAPTCHA" src="${esc(k.img||'')}" style="display:block;margin:6px 0;max-width:260px;background:#fff;border-radius:6px">
-   <div class="row"><input id="hocapin" maxlength="12" autocomplete="off" spellcheck="false" style="max-width:12em;font-size:18px;letter-spacing:3px" data-n="${esc(String(k.n||''))}"><button class="btn" data-act="hoCap">Sign in</button></div>`}</div>`}
-async function hoCap(t){const H=ui.ho;if(!H||!H.captcha)return;const v=t.dataset.v||(document.getElementById('hocapin')?.value||'').trim();if(!v)return document.getElementById('hocapin')?.focus();
-  t.disabled=true;const {error}=await sb.rpc('handoff_captcha_answer',{hid:H.id,ans:v});
-  if(error){t.disabled=false;return toast(error.message)}H.captcha=null;H.capSent=true;toast('Sent to 1Go: signing in…');render()}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='hocapin'){const b=document.querySelector('[data-act="hoCap"]');if(b)b.click()}});
+function rcHave(d){const fm=fyMonths(d.fy),cnt=s=>{if(s==='g1'||s==='g2b'||s==='g3b')return Object.keys(d[s]||{}).filter(m=>fm.includes(m)).length;return 0};
+  return {g1:cnt('g1'),g2b:cnt('g2b'),g3b:cnt('g3b'),hasAny:cnt('g1')+cnt('g2b')+cnt('g3b')>0}}
+function fetchPanel(c,d){
+  const can=mode==='supa',fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),sel=ui.fetchSel||{items:['GSTR1','GSTR2B','GSTR3B'],months:def.length?def:fm.slice(0,1)};
+  const got=rcHave(d);
+  return `<div class="panel"><h3>${ic('down')}Fetch GST returns</h3><p class="small muted" style="margin:-4px 0 8px">Click to open the GST portal's return downloads for this client, one per return and month. Download each file it gives you, drop it into the portal-files box on the left, and Smart Auditing reads and matches it here — for any volume, long or short. No separate app, no handoff: the matching is done in this app.</p>
+   <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-fetchitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
+   <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-fetchmonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
+   ${!c.gstin?`<p class="small"><span class="tag y">GSTIN needed</span> Add the client's GSTIN in the client master first.</p>`:''}
+   <div class="row"><button class="btn" data-act="fetchStart" ${can&&!c.gstin?'disabled':''}>${ic('down')}Fetch GST returns</button><span class="small">${sel.items.length} return${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
+   ${got.hasAny?`<p class="small muted" style="margin:6px 0 0">Already in the app: ${got.g1} GSTR-1, ${got.g2b} GSTR-2B, ${got.g3b} GSTR-3B month-sets.</p>`:''}
+   <p class="small muted" style="margin:6px 0 0"><b>What to download:</b> GSTR-1 as JSON (or ZIP of JSON) · GSTR-2B as Excel or JSON · GSTR-3B as JSON, or the 3B summary template CSV. For 1,000+ invoices the app reads every invoice — drop the whole file in, it matches them all.</p></div>`}
+
 function reconTab(c){
   const d=rcOpen(c),cur=Object.keys(RC).includes(ui.rtab)?ui.rtab:'data';
   const R={};for(const k of Object.keys(RC))R[k]=recon(d,k);
@@ -274,7 +265,7 @@ function rcData(c,d,R){
    <label class="drop" data-drop="rcportal" style="margin-bottom:12px">${ic('up')}<b>Portal files: GSTR-1, GSTR-2B, GSTR-3B</b><span class="small">GSTR-1 JSON or ZIP · GSTR-2B Excel or JSON · GSTR-3B JSON, or the <a href="#" data-act="g3bTpl">3B summary template</a>. Several files at once is fine.</span><input type="file" data-file="rcportal" accept=".json,.zip,.xlsx,.xls,.csv" multiple hidden></label>
    <div class="row small" style="margin:-4px 0 12px"><label class="f" style="flex:0 1 14em">Month, if the file does not say<select id="rc-month" data-rcmonth="1"><option value="">From the file</option>${fyMonths(d.fy).map(m=>`<option value="${m}" ${ui.rcMonth===m?'selected':''}>${mLabel(m)}</option>`).join('')}</select></label></div>
    <label class="drop" data-drop="rctds">${ic('up')}<b>TDS: challan list or TDS register</b><span class="small">Challans from the Income Tax portal / TRACES (BSR code, date, serial, amount), or a TDS register (date, section, party, PAN, TDS).</span><input type="file" data-file="rctds" accept=".csv,.xlsx,.xls,.xml" hidden></label></div>
-   <div>${onegoPanel(c,d)}<div class="panel" style="margin-top:12px"><h3>Rounding tolerance</h3><div class="row"><label class="f" style="flex:0 1 10em">Ignore differences up to (₹)<input type="number" min="0" step="1" id="rc-tol" data-rctol="1" value="${tol(d)}"></label></div></div></div></div>
+   <div>${fetchPanel(c,d)}<div class="panel" style="margin-top:12px"><h3>Rounding tolerance</h3><div class="row"><label class="f" style="flex:0 1 10em">Ignore differences up to (₹)<input type="number" min="0" step="1" id="rc-tol" data-rctol="1" value="${tol(d)}"></label></div></div></div></div>
    <h2 class="section">What is in, FY ${esc(d.fy)}</h2>${rcCoverage(d)}
    <div class="scroll" style="margin-top:14px"><table><thead><tr><th>Reconciliation</th><th>Months compared</th><th class="num">Tax difference</th><th>Status</th></tr></thead><tbody>${Object.entries(RC).map(([k,l])=>{const r=R[k];return `<tr class="click" data-act="rtab" data-v="${k}"><td><b>${l}</b></td><td>${k==='r5'?r.rows.filter(x=>x.a!=null).length:r.both.length}</td><td class="num">${k==='r5'?sgn(r.short):r.both.length?sgn(r.diffTax):'—'}</td><td>${rcState(r.state)}</td></tr>`}).join('')}</tbody></table></div>
    ${d.files?.length||d.chl?`<p class="small muted" style="margin-top:10px">Files: ${[...(d.files||[]).map(f=>f.name),...Object.values(d.g1).concat(Object.values(d.g2b),Object.values(d.g3b)).map(x=>x.from)].filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,14).map(esc).join(' · ')}</p>`:''}`}
@@ -344,53 +335,40 @@ function mandCard(c){
   return `<div class="panel" style="margin:12px 0 4px;padding:12px 16px"><div class="row" style="gap:10px;margin-bottom:6px"><b class="sp">Mandatory procedures</b>${m.done?'<span class="tag g">Complete</span>':'<span class="small muted">Needed before the audit is reported</span>'}</div>
    ${[['vouching','Vouching',m.vouch,'SIA 320 evidence · SIA 5 sampling'],['recon','GST reconciliations (GSTR-1, 2B, 3B)',m.gst,'SIA 150 compliance with laws'],['recon','TDS vs books',m.tds,'']].map(([tab,l,x,ref])=>`<div class="row small" style="gap:10px;padding:3px 0">${tag[x.st]}<a href="#" data-act="tab" data-tab="${tab}"${tab==='recon'&&l.startsWith('TDS')?' data-rt="r5"':''}><b>${l}</b></a><span class="muted">${esc(x.text)}</span>${ref?`<span class="tag n" style="margin-left:auto">${ref}</span>`:''}</div>`).join('')}</div>`}
 
-/* ---------- 1Go handover ---------- */
-const hex=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
-async function hoStart(c){
-  const items=[...document.querySelectorAll('[data-hoitem]:checked')].map(x=>x.dataset.hoitem),months=[...document.querySelectorAll('[data-homonth]:checked')].map(x=>x.dataset.homonth).sort();
-  ui.hoSel={items,months};
-  if(!items.length||!months.length)return toast('Choose what to get and at least one month.');
-  if(items.some(i=>i!=='TDS')&&!isGstin(c.gstin))return toast('Add the client\'s GSTIN in the client master first.');
-  const token=hex(crypto.getRandomValues(new Uint8Array(32))),th=hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)));
-  const req={app:'Smart Auditing',v:1,client:c.name,gstin:(c.gstin||'').toUpperCase(),pan:(c.gstin||'').slice(2,12).toUpperCase(),fy:fyNow(),months:months.map(m=>({fy:fyOfKey(m),month:+m.slice(5,7)})),items,by:session?.user?.email||''};
-  const {data:id,error}=await sb.rpc('handoff_create',{ws:ws.id,client:c.id,req,thash:th});if(error)return toast('Could not start: '+error.message);
-  const link='onego://smart-auditing?h='+encodeURIComponent(id)+'&t='+token;
-  ui.ho={id,client:c.id,status:'pending',link,message:''};render();
-  location.href=link;hoWatch();}
-/* 1Go quiet, or the request ran out: say so plainly instead of waiting on "working" */
-function hoQuiet(H){if(!H||H.status!=='working')return'';const now=Date.now(),up=Date.parse(H.updated_at||0),ex=Date.parse(H.expires_at||0),got=(H.said||[]).length;
-  if(ex&&ex<now)return `<br><span style="color:var(--hi)">This request ended without 1Go finishing it (1Go may have been closed).${got?' The returns already received are kept.':''} Click Get from 1Go to ask again.</span>`;
-  if(up&&now-up>20*60000)return `<br><span class="muted">No news from 1Go for ${Math.round((now-up)/60000)} minutes. The GST portal can take up to 30 minutes to prepare GSTR-1 for a month; keep 1Go open.${got?' Returns received so far are already in.':''}</span>`;return''}
-async function hoWatch(){
-  clearTimeout(hoWatch.t);const H=ui.ho;if(!H||mode!=='supa')return;
-  const {data,error}=await sb.from('handoffs').select('status,message,captcha,updated_at,expires_at').eq('id',H.id).maybeSingle();
-  if(!error&&data){const n=d=>d&&d.captcha?String(d.captcha.n||'')+(d.captcha.at||''):'';let ch=data.status!==H.status||data.message!==H.message||n(data)!==n(H);Object.assign(H,data);const q=hoQuiet(H);if(q!==H.lastQuiet){H.lastQuiet=q;ch=true}
-    if(ch){schedule();if(data.captcha&&document.hidden===false)setTimeout(()=>document.getElementById('hocapin')?.focus(),300)}}
-  if(H.status==='done'||H.status==='failed'){await hoCollect(H,true);return}
-  if(H.status==='cancelled')return;
-  /* while 1Go works: take in the returns already sent, every 15 seconds */
-  if(H.status==='working'&&Date.now()-(H.lastTake||0)>15000){H.lastTake=Date.now();hoCollect(H,false)}
-  hoWatch.t=setTimeout(hoWatch,H.status==='working'?3000:4000)}
-/* 25 Nov 2026: what 1Go sends is taken in as it arrives (each return as soon as it is downloaded), and at the end the rest */
-async function hoCollect(H,final=true){
-  const c=S.clients.find(x=>x.id===H.client);if(!c||H.collected||H.taking)return;H.taking=true;H.got=H.got||new Set();H.said=H.said||[];H.errs=H.errs||[];
-  try{
-  const {data:parts,error}=await sb.from('handoff_parts').select('id,name,kind,period,data').eq('handoff_id',H.id).order('id');
-  if(error){if(final)toast('Could not read what 1Go sent: '+error.message);return}
-  const res=[],fresh=(parts||[]).filter(p=>!H.got.has(p.id));
-  for(const p of fresh){H.got.add(p.id);try{
-    if(p.kind==='TDS_CHALLANS'){res.push({kind:'chl',rows:(p.data.rows||[]).map(x=>({bsr:String(x.bsr),date:ymdOf(x.date),serial:String(x.serial||''),amount:+x.amount||0,section:x.section||'',minor:x.minor||''}))});continue}
-    if(p.kind==='NOTE'||p.kind==='TDS_OTHER')continue;
-    let buf,name=p.name;if(p.data.b64){const bin=atob(p.data.b64);buf=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);buf=buf.buffer}else{buf=new TextEncoder().encode(JSON.stringify(p.data.json??p.data)).buffer;if(!/\.json$/i.test(name))name+='.json'}
-    const prev=ui.rcMonth;ui.rcMonth=fpToKey(p.period)||p.period||'';const r=await readPortalFile(name,buf,p.kind==='GSTR2B'?'g2b':'');ui.rcMonth=prev;
-    for(const x of r)if(!x.period&&x.kind!=='chl')x.period=fpToKey(p.period)||p.period;res.push(...r);
-    try{await rcEvidence(c,new File([buf],name),'GST portal data via 1Go')}catch(e){}
-  }catch(e){H.errs.push(p.name+': '+e.message)}}
-  if(res.length){try{const said=await putPortal(c,mergeG1(res),'1Go');H.said.push(...said);if(!final)toast('From 1Go: '+said.join(', '))}catch(e){H.errs.push(e.message)}}
-  if(!final){schedule();return}
-  H.collected=true;const d=rcOpen(c);await put('recons',d.id,{...d,handoffs:[...(d.handoffs||[]),H.id].slice(-50)});
-  H.message=(H.said.length?'Received: '+H.said.join(', '):'Nothing usable was received')+(H.errs.length?'. Problems: '+H.errs.join('; '):'')+(H.message?' · 1Go: '+H.message:'');
-  toast(H.said.length?H.said.length+' sets of data received from 1Go':'1Go sent nothing usable');schedule()}finally{H.taking=false}}
+/* ---------- in-app click-to-fetch of GST returns ----------
+   Replaces the old "Get from 1Go" handover: the app builds the GST portal's
+   return-download URLs for the selected returns and months and opens them in
+   the browser. The user signs in to the portal (once, in their own browser),
+   downloads each file, and drops it into the portal-files box — the app then
+   reads and matches it in-app, for any invoice volume (long or short). */
+function gstDownloadUrls(c,items,months){
+  const gstin=(c.gstin||'').replace(/\s/g,'').toUpperCase();
+  const base='https://gst.gov.in';
+  const urls=[];
+  for(const it of items){
+    for(const m of months){
+      const [fy,mm]=m.split('-');
+      if(it==='GSTR1')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-1&action=download`});
+      else if(it==='GSTR2B')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-2B&action=download`});
+      else if(it==='GSTR3B')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-3B&action=download`});
+    }
+  }
+  return urls;
+}
+async function fetchStart(){
+  const c=C();if(!c)return;
+  const items=[...document.querySelectorAll('[data-fetchitem]:checked')].map(x=>x.dataset.fetchitem);
+  const months=[...document.querySelectorAll('[data-fetchmonth]:checked')].map(x=>x.dataset.fetchmonth).sort();
+  ui.fetchSel={items,months};
+  if(!items.length||!months.length)return toast('Choose what to fetch and at least one month.');
+  if(!isGstin(c.gstin))return toast("Add the client's GSTIN in the client master first.");
+  const urls=gstDownloadUrls(c,items,months);
+  /* open the portal download pages; the browser handles sign-in and the download.
+     Each returns a file the user drops back into the portal-files box. */
+  toast(`Opening ${urls.length} ${urls.length===1?'download':'downloads'} from the GST portal`);
+  for(let i=0;i<urls.length;i++){setTimeout(()=>{const w=window.open(urls[i].url,'_blank','noopener');if(!w)toast('Pop-up blocked for one download — allow pop-ups for this site and try again.')},i*600)}
+  render();
+}
 
 /* ---------- actions ---------- */
 const rcCsvRows={
@@ -401,8 +379,7 @@ Object.assign(ACT,{
   rtab:t=>{ui.rtab=t.dataset.v;render()},
   rcf:t=>{ui.rcf=t.dataset.v;render()},
   g3bTpl:()=>dlFile('GSTR-3B summary template.csv',G3B_TEMPLATE),
-  hoStart:()=>hoStart(C()),
-  hoCap:t=>hoCap(t),
+  fetchStart:()=>fetchStart(),
   rcCsv:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=k==='r5'?rcCsvRows.tds(r):[...rcCsvRows.mon(r,k),...(r.inv.length?[[],...rcCsvRows.inv(r)]:[])];dlFile(fileSafe(c.name)+' '+RCSHORT[k]+' FY '+d.fy+'.csv',rows.map(x=>x.map(q).join(',')).join('\n'))},
   rcObs:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k);
     const cond=k==='r5'?`TDS deducted in the books of ${inr(R2((d.tB?.rows||[]).filter(x=>x.kind==='ded').reduce((s,x)=>s+x.amount,0)))} was not fully deposited by the due dates: ${inr(r.short)} remains unpaid; estimated interest ${inr(r.interest)}. ${r.unbooked.length} challans are not found in the books.`:
@@ -411,9 +388,9 @@ Object.assign(ACT,{
     newObs({clientId:c.id,auditId:A()?.id||'',title:'Differences in '+RC[k],rating:Math.abs(k==='r5'?r.short:r.diffTax)>100000?'H':'M',condition:cond,criteria:crit,effect:k==='r5'?'Interest and possible disallowance of the expense.':'Possible tax demand, interest and penalty; ITC at risk.',rec:'Reconcile the differences with the client, correct them in the next return or by payment / reversal through DRC-03, and keep the reconciliation on file every month.'})}
 });
 document.addEventListener('change',e=>{
-  const t=e.target;if(!(t.dataset.rctol||t.dataset.rcconc!=null||t.dataset.rcnote!=null||t.dataset.rcmonth||t.dataset.hoitem||t.dataset.homonth))return;
+  const t=e.target;if(!(t.dataset.rctol||t.dataset.rcconc!=null||t.dataset.rcnote!=null||t.dataset.rcmonth||t.dataset.fetchitem||t.dataset.fetchmonth))return;
   if(t.dataset.rcmonth){ui.rcMonth=t.value;return}
-  if(t.dataset.hoitem||t.dataset.homonth){ui.hoSel={items:[...document.querySelectorAll('[data-hoitem]:checked')].map(x=>x.dataset.hoitem),months:[...document.querySelectorAll('[data-homonth]:checked')].map(x=>x.dataset.homonth)};return}
+  if(t.dataset.fetchitem||t.dataset.fetchmonth){ui.fetchSel={items:[...document.querySelectorAll('[data-fetchitem]:checked')].map(x=>x.dataset.fetchitem),months:[...document.querySelectorAll('[data-fetchmonth]:checked')].map(x=>x.dataset.fetchmonth)};return}
   const c=C(),d=rcOpen(c);
   if(t.dataset.rctol)return put('recons',d.id,{...d,tol:Math.max(0,+t.value||0)});
   const k=t.dataset.rcconc??t.dataset.rcnote,n={...(d.notes?.[k]||{})};if(t.dataset.rcconc!=null)n.conc=t.value;else n.text=t.value;
