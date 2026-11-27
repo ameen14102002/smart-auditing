@@ -242,16 +242,28 @@ function rcCoverage(d){const fm=fyMonths(d.fy),has=(s,m)=>s==='bS'||s==='bP'?!!d
   return `<div class="scroll"><table class="cov"><thead><tr><th>Source</th>${fm.map(m=>`<th class="num">${mLabel(m)}</th>`).join('')}</tr></thead><tbody>${Object.entries(RSRC).map(([s,l])=>`<tr><td>${l}</td>${fm.map(m=>`<td class="num">${has(s,m)?'<span style="color:var(--ok)">●</span>':'<span class="muted">·</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
 function rcHave(d){const fm=fyMonths(d.fy),cnt=s=>{if(s==='g1'||s==='g2b'||s==='g3b')return Object.keys(d[s]||{}).filter(m=>fm.includes(m)).length;return 0};
   return {g1:cnt('g1'),g2b:cnt('g2b'),g3b:cnt('g3b'),hasAny:cnt('g1')+cnt('g2b')+cnt('g3b')>0}}
+/* ---------- in-app GST automation (Playwright service) ---------- */
+const gstSanitize=s=>String(s||'').replace(/[^A-Za-z0-9._-]+/g,'_').slice(0,80);
+const gstManifest=()=>ui.gstManifest||{storage:{bucket:'gst-returns',pathTemplate:'{client}/{ret}_{month}.{ext}'}};
+const gstFmt=(t,v)=>t.replace(/\{(\w+)\}/g,(_,k)=>String(v[k]??''));
+const gstPath=(client,ret,month,ext)=>gstFmt(gstManifest().storage.pathTemplate,{client:gstSanitize(client),ret,month,ext});
+async function gstCheck(){const u=ui.gstFetchUrl;if(!u)return;try{const r=await fetch(u+'/health',{method:'GET'});if(r.ok){ui.gstOnline=true;if(!ui.gstManifest){try{ui.gstManifest=await(await fetch(u+'/manifest')).json()}catch(e){}}}else ui.gstOnline=false}catch(e){ui.gstOnline=false}schedule()}
+/* pull the files the automation downloaded to Supabase Storage and match them in-app */
+async function rcPullStorage(c){try{const M=gstManifest(),bucket=M.storage.bucket,root=gstSanitize(c.name);toast('Pulling downloaded returns from storage…');const {data,error}=await sb.storage.from(bucket).list(root,{limit:1000});if(error)throw new Error(error.message);const files=(data||[]).filter(f=>/\.(json|zip|xlsx|xls|csv)$/i.test(f.name));if(!files.length)return toast('Nothing downloaded for this client yet — run Fetch from the portals first.');let said=[];for(const f of files){const p=root+'/'+f.name;const {data:blob,error:de}=await sb.storage.from(bucket).download(p);if(de)throw new Error(de.message);const res=await readPortalFile(f.name,await blob.arrayBuffer(),'');said.push(...await putPortal(c,res,'portal-fetch'));}toast('Pulled '+said.length+' set'+(said.length===1?'':'s')+' from storage: '+said.join(', '))}catch(e){toast('Pull failed: '+(e.message||e))}}
 function fetchPanel(c,d){
   const fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),sel=ui.fetchSel||{items:['GSTR1','GSTR2B','GSTR3B'],months:def.length?def:fm.slice(0,1)};
   const got=rcHave(d),needGst=sel.items.some(i=>i!=='TDS');
-  return `<div class="panel"><h3>${ic('down')}Fetch from the portals</h3><p class="small muted" style="margin:-4px 0 8px">Click to open the portal downloads for this client — GST returns (GSTR-1, 2B, 3B) and TDS challans. Download each file it gives you, drop it into the matching box on the left, and Smart Auditing reads and matches it here — for any volume, long or short. No separate app, no handoff: the matching is done in this app.</p>
+  if(!('gstOnline' in ui)){ui.gstOnline=null;gstCheck()}
+  const auto=ui.gstOnline===true,job=ui.gstJob;
+  return `<div class="panel"><h3>${ic('down')}Fetch from the portals</h3><p class="small muted" style="margin:-4px 0 8px">${auto?'Playwright automation is on — the app downloads the GST returns from the portal itself and reads them in.':'Open the portal downloads, drop each file into the matching box on the left, and Smart Auditing reads and matches it here — for any volume, long or short.'} No 1Go, no handoff: the matching is done in this app.</p>
    <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B'],['TDS','TDS challans']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-fetchitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
    <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-fetchmonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
    ${needGst&&!c.gstin?`<p class="small"><span class="tag y">GSTIN needed</span> Add the client's GSTIN in the client master to fetch the GST returns.</p>`:''}
-   <div class="row"><button class="btn" data-act="fetchStart" ${needGst&&!c.gstin?'disabled':''}>${ic('down')}Fetch from the portals</button><span class="small">${sel.items.length} item${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
+   <div class="row"><button class="btn" data-act="fetchStart" ${needGst&&!c.gstin?'disabled':''}>${ic('down')}Fetch from the portals</button><button class="btn ghost" data-act="rcPull">${ic('up')}Pull downloaded files</button><span class="small">${sel.items.length} item${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
+   ${ui.gstOnline===true?`<p class="small" style="margin:6px 0 0"><span class="tag g">Automation on</span> ${esc(ui.gstFetchUrl)} — click Fetch to download automatically.</p>`:ui.gstOnline===false?`<p class="small" style="margin:6px 0 0"><span class="tag y">Automation off</span> ${esc(ui.gstFetchUrl)} not reachable. Run the gst-fetch service for full automation; otherwise the Fetch button opens the portal for a manual download.</p>`:''}
+   ${job?`<p class="small muted" style="margin:6px 0 0">Automation ${esc(job.status)}: downloaded ${job.downloaded||0}, uploaded ${job.uploaded||0}${job.errors&&job.errors.length?' · '+job.errors.length+' error'+(job.errors.length===1?'':'s'):''}.</p>`:''}
    ${got.hasAny?`<p class="small muted" style="margin:6px 0 0">Already in the app: ${got.g1} GSTR-1, ${got.g2b} GSTR-2B, ${got.g3b} GSTR-3B month-sets.</p>`:''}
-   <p class="small muted" style="margin:6px 0 0"><b>What to download:</b> GSTR-1 as JSON (or ZIP of JSON) · GSTR-2B as Excel or JSON · GSTR-3B as JSON, or the 3B summary template CSV · TDS challans from TRACES (CSV/Excel). For 1,000+ invoices the app reads every invoice — drop the whole file in, it matches them all.</p></div>`}
+   <p class="small muted" style="margin:6px 0 0"><b>What it fetches:</b> GSTR-1 as JSON (or ZIP of JSON) · GSTR-2B as Excel or JSON · GSTR-3B as JSON, or the 3B summary template CSV · TDS challans from TRACES (CSV/Excel). For 1,000+ invoices the app reads every invoice.</p></div>`}
 
 function reconTab(c){
   const d=rcOpen(c),cur=Object.keys(RC).includes(ui.rtab)?ui.rtab:'data';
@@ -363,12 +375,20 @@ async function fetchStart(){
   ui.fetchSel={items,months};
   if(!items.length||!months.length)return toast('Choose what to fetch and at least one month.');
   if(items.some(i=>i!=='TDS')&&!isGstin(c.gstin))return toast("Add the client's GSTIN in the client master to fetch the GST returns.");
+  /* prefer the Playwright automation service when it is reachable */
+  if(ui.gstFetchUrl){try{const r=await fetch(ui.gstFetchUrl+'/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client:c.name,gstin:c.gstin,items,months})});if(r.ok){const {id}=await r.json();if(id){ui.gstJob={id,status:'running',downloaded:0,uploaded:0,errors:[]};toast('Automation started — downloading in the background');render();gstWatch();return}}}catch(e){/* not reachable: fall through to manual */}}
+  /* fallback: open the portal download URLs in the browser */
   const urls=portalDownloadUrls(c,items,months);
-  /* open the portal download pages; the browser handles sign-in and the download.
-     Each returns a file the user drops back into the matching box (portal files for GST, TDS box for challans). */
   toast(`Opening ${urls.length} ${urls.length===1?'download':'downloads'} from the portals`);
   for(let i=0;i<urls.length;i++){setTimeout(()=>{const w=window.open(urls[i].url,'_blank','noopener');if(!w)toast('Pop-up blocked for one download — allow pop-ups for this site and try again.')},i*600)}
   render();
+}
+async function gstWatch(){
+  const id=ui.gstJob?.id;if(!id||!ui.gstFetchUrl)return;
+  try{const s=await(await fetch(ui.gstFetchUrl+'/status/'+id)).json();Object.assign(ui.gstJob,s);
+    if(s.status==='running'){schedule();setTimeout(gstWatch,2500)}
+    else{const c=C();if(s.status==='done'&&(s.uploaded||0)>0)await rcPullStorage(c).catch(()=>{});if(s.status==='done')toast(`Automation done: ${s.uploaded||0} file${(s.uploaded||0)===1?'':'s'} downloaded`);else if(s.status==='error')toast('Automation failed: '+(s.errors[0]||'unknown'));ui.gstJob=null;schedule()}}
+  catch(e){ui.gstJob=null;schedule()}
 }
 
 /* ---------- actions ---------- */
@@ -381,6 +401,7 @@ Object.assign(ACT,{
   rcf:t=>{ui.rcf=t.dataset.v;render()},
   g3bTpl:()=>dlFile('GSTR-3B summary template.csv',G3B_TEMPLATE),
   fetchStart:()=>fetchStart(),
+  rcPull:()=>rcPullStorage(C()),
   rcCsv:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=k==='r5'?rcCsvRows.tds(r):[...rcCsvRows.mon(r,k),...(r.inv.length?[[],...rcCsvRows.inv(r)]:[])];dlFile(fileSafe(c.name)+' '+RCSHORT[k]+' FY '+d.fy+'.csv',rows.map(x=>x.map(q).join(',')).join('\n'))},
   rcObs:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k);
     const cond=k==='r5'?`TDS deducted in the books of ${inr(R2((d.tB?.rows||[]).filter(x=>x.kind==='ded').reduce((s,x)=>s+x.amount,0)))} was not fully deposited by the due dates: ${inr(r.short)} remains unpaid; estimated interest ${inr(r.interest)}. ${r.unbooked.length} challans are not found in the books.`:

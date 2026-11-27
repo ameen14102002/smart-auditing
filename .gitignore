@@ -1,0 +1,7 @@
+# gst-fetch service
+gst-fetch/node_modules/
+gst-fetch/.gst-profile/
+
+# generic
+node_modules/
+*.log
