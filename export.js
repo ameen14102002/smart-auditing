@@ -109,8 +109,6 @@ Object.assign(ACT,{
     if(!L.length)return toast('No audits are linked to '+mkLabel(mk)+' yet: tick the areas covered on each visit.');auditReportXlsx(L,'Internal audit report - '+c.name+' - '+mkLabel(mk))}});
 document.addEventListener('change',e=>{const t=e.target,ds=t.dataset;if(ds.xrc!==undefined){ui.xrC=t.value;ui.xrSel=null;return render()}
   if(ds.xra){ui.xrSel=ui.xrSel||new Set();t.checked?ui.xrSel.add(ds.xra):ui.xrSel.delete(ds.xra);render()}});
-/* the audit's own Report tab: the same Excel of this audit, beside the automatic report (which is unchanged) */
-const _reportTabX=reportTab;reportTab=function(a){return _reportTabX(a).replace('<button class="btn ghost" data-act="copyRep">',`<button class="btn ghost" data-act="xAudit">${ic('down')}Excel of this audit</button><button class="btn ghost" data-act="copyRep">`)};
 
 /* ---------- styled workbooks (1Go's writer, xlsxsa.js) and the audit report laid out as a report ---------- */
 const colLetter=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s};
@@ -158,4 +156,4 @@ const _xlsxSaveX=xlsxSave;xlsxSave=async function(sheets,name){
   const used=new Set(),B=sheets.map(([n,rows,o])=>{const sh=o?.styled||styleSheet(n,rows,name);sh.name=sheetName(sh.name||n,used);return sh});
   const u=SA_XLSX.book(B),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=fileSafe(name)+'.xlsx';document.body.appendChild(a);a.click();a.remove();toast('Excel saved: '+fileSafe(name))};
 /* the audit's own Excel is the audit report of that audit, with every procedure's working */
-ACT.xAudit=async()=>{const a=A(),c=C();toast('Preparing the audit report in Excel…');await xlsxSave(auditReportSheets([a],a.title),'Internal audit report - '+c.name+' - '+a.title+(a.period?' - '+a.period:''))};
+ACT.xAudit=async()=>{const a=A(),c=C();toast('Preparing the audit report in Excel…');await xlsxSave(auditReportSheets([a],a.title),'Smart Auditing - Internal audit report - '+c.name+' - '+a.title+(a.period?' - '+a.period:''))};

@@ -1,19 +1,22 @@
 /* VOICE work: an internal audit workbench, calm and dense like a well-kept audit file
    IDEA the engagement file: client folder with tabs, a stage stepper on each audit, evidence stapled to each check
    PICTURE the live working surface itself: applicability list, quarter board, checklist with evidence chips
-   COLOUR navy rail #0b1433, white sheets, ultramarine #3b4fd8 actions; ratings red #e8452c, amber #f2b705, teal #3fb7bd; green #1f9d6a for done
-   TYPE Red Hat Display 700/800 headings + Red Hat Text body
+   COLOUR ledger ink rail #102347, paper #f8f9fc, ultramarine #2f4bd8 actions; ratings red #c93a2e, amber #f2b705, teal #3fb7bd; green #17875a for done
+   TYPE IBM Plex Sans throughout (single skin; merged design layer 26 Nov 2026)
    LAYOUT laptop: rail | sticky top bar (breadcrumb, search, action) over the sheet; phone: rail becomes a top strip, tabs scroll */
 :root{color-scheme:light dark;
---bg:light-dark(#ffffff,#0d1430);--sheet:light-dark(#f6f7fb,#121a3a);--card:light-dark(#ffffff,#16204a);
---ink:light-dark(#121833,#e9ecf8);--muted:light-dark(#5b6283,#a6aecd);--line:light-dark(#e1e4ef,#273160);
---rail:#0b1433;--rail2:#141f4b;--acc:#3b4fd8;--acc-ink:light-dark(#2a3cc0,#9aa7ff);--acc-soft:light-dark(#eef0fd,#1d2760);
---hi:#e8452c;--md:#f2b705;--lo:#3fb7bd;--ok:#1f9d6a;--warn-soft:light-dark(#fff6dc,#3a3217);
---r:10px;--shadow:0 1px 2px rgb(10 20 60 / .06)}
+--bg:light-dark(#f8f9fc,#0c1530);--sheet:light-dark(#f1f3f8,#111c3d);--card:light-dark(#ffffff,#15224a);
+--ink:light-dark(#14203d,#e8ecf8);--muted:light-dark(#5a6482,#a7b0cf);--line:light-dark(#dde2ee,#26325e);
+--rail:#102347;--rail2:#1a3160;--acc:#2f4bd8;--acc-ink:light-dark(#2b43c4,#a5b2ff);--acc-soft:light-dark(#edf0fd,#1c2a5e);
+--hi:#c93a2e;--md:#f2b705;--lo:#3fb7bd;--ok:#17875a;--warn-soft:light-dark(#fff6dc,#3a3217);
+--sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+--t-fast:120ms;--t-med:200ms;--t-slow:600ms;--ease:cubic-bezier(.2,.7,.2,1);
+--r:12px;--shadow:0 1px 2px rgb(16 35 71 / .05),0 4px 14px -6px rgb(16 35 71 / .10);
+--shadow-lg:0 1px 2px rgb(16 35 71 / .06),0 18px 40px -16px rgb(16 35 71 / .22)}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.5 "Red Hat Text",system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:clip}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);letter-spacing:-.003em;overflow-x:clip}
 button,input,select,textarea{font:inherit;color:inherit}
 svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
@@ -21,9 +24,9 @@ svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%;background:linear-gradient(to right,var(--rail) 240px,transparent 240px)}
 a{color:var(--acc-ink);text-underline-offset:3px}
 .side{background:var(--rail);color:#cfd5f5;display:flex;flex-direction:column;padding:18px 12px;gap:2px;position:sticky;top:0;height:100vh}
-.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;color:#fff;font:800 19px/1.1 "Red Hat Display",system-ui,sans-serif}
-.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--acc);display:grid;place-items:center}
-.brand small{display:block;font:500 12px "Red Hat Text",system-ui,sans-serif;color:#8f9be0;margin-top:3px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;color:#fff;font:600 17px/1.15 var(--sans);letter-spacing:-.01em}
+.brand .mark{width:36px;height:36px;border-radius:10px;background:none;display:block}
+.brand small{display:block;font:400 12px var(--sans);color:#9fb0e6;margin-top:3px;letter-spacing:0}
 .nav a{display:flex;align-items:center;gap:11px;color:#cfd5f5;text-decoration:none;padding:10px 12px;border-radius:8px;font-weight:500;min-height:42px}
 .nav a:hover{background:var(--rail2);color:#fff}
 .nav a.on{background:var(--acc);color:#fff}
@@ -45,9 +48,9 @@ a{color:var(--acc-ink);text-underline-offset:3px}
 main{padding:clamp(18px,2.6vw,34px) max(2.5vw,16px) 60px;width:100%;max-width:1320px}
 
 /* type */
-h1{font:800 clamp(26px,3vw,36px)/1.08 "Red Hat Display",system-ui,sans-serif;letter-spacing:-.02em;margin:0;text-wrap:balance}
-h2{font:700 19px/1.25 "Red Hat Display",system-ui,sans-serif;margin:0 0 10px}
-h3{font:700 16px/1.3 "Red Hat Text",system-ui,sans-serif;margin:0 0 6px}
+h1{font:600 clamp(26px,3vw,36px)/1.15 var(--sans);letter-spacing:-.018em;margin:0;text-wrap:balance}
+h2{font:600 19px/1.25 var(--sans);letter-spacing:-.01em;margin:0 0 10px}
+h3{font:600 16px/1.3 var(--sans);margin:0 0 6px}
 .sub{color:var(--muted);margin:6px 0 0;max-width:72ch}
 .muted{color:var(--muted)}.small{font-size:13px}
 .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -73,7 +76,7 @@ a.card{display:block;color:inherit;text-decoration:none}a.card:hover{border-colo
 /* KPI strip */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5em,1fr));gap:10px;margin:4px 0 20px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
-.kpi b{display:block;font:800 clamp(22px,2.4vw,28px)/1.05 "Red Hat Display",system-ui,sans-serif;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.kpi b{display:block;font:600 clamp(22px,2.4vw,28px)/1.05 var(--sans);letter-spacing:-.02em;margin-bottom:4px;font-variant-numeric:tabular-nums}
 .kpi span{color:var(--muted);font-size:13px}
 .kpi.alert b{color:var(--hi)}.kpi.good b{color:var(--ok)}
 
@@ -107,8 +110,8 @@ label.f .hint{font-weight:400;font-size:12.5px}
 label.cb{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--ink);min-height:42px}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13.5em),1fr));gap:12px 14px}
 .form .wide{grid-column:1/-1}
-fieldset{border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;margin:0 0 14px;background:var(--card)}
-legend{font:700 15px "Red Hat Display",system-ui,sans-serif;padding:0 6px}
+fieldset{border:1px solid var(--line);border-radius:14px;padding:16px 18px 18px;margin:0 0 14px;background:var(--card);box-shadow:var(--shadow)}
+legend{font:600 14px var(--sans);letter-spacing:-.01em;padding:0 8px}
 
 /* tabs */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:4px 0 20px;overflow-x:auto;scrollbar-width:thin}
@@ -137,7 +140,7 @@ td.grp{font-weight:700;color:var(--muted);font-size:12.5px;padding-top:16px}
 
 /* checklist */
 .chk{display:grid;grid-template-columns:2.2em minmax(0,1fr) auto;gap:6px 12px;padding:14px 0;border-bottom:1px solid var(--line)}
-.chk .no{font:700 14px "Red Hat Display",system-ui,sans-serif;color:var(--muted);padding-top:2px}
+.chk .no{font:600 13px var(--sans);color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums}
 .chk .q{font-weight:600}
 .chk .ref{font-size:12.5px;color:var(--muted)}
 .chk .body{grid-column:2/-1}
@@ -150,7 +153,7 @@ td.grp{font-weight:700;color:var(--muted);font-size:12.5px;padding-top:16px}
 .drop{border:1.5px dashed color-mix(in srgb,var(--acc) 45%,var(--line));border-radius:12px;padding:20px;text-align:center;background:var(--acc-soft);color:var(--acc-ink);cursor:pointer;display:block}
 .drop.over{background:color-mix(in srgb,var(--acc) 18%,var(--card))}
 .drop b{display:block;font-size:15px}
-.fileic{width:34px;height:40px;border-radius:5px;display:grid;place-items:center;font:800 10px "Red Hat Display",system-ui,sans-serif;color:#fff;flex:none;text-transform:uppercase}
+.fileic{width:34px;height:40px;border-radius:7px;display:grid;place-items:center;font:600 10px var(--sans);letter-spacing:.02em;color:#fff;flex:none;text-transform:uppercase;box-shadow:0 2px 6px -2px rgb(16 35 71 / .35)}
 .fileic.xls{background:#1f7a4a}.fileic.pdf{background:#c8382a}.fileic.img{background:#6d4bd1}.fileic.doc{background:#2b5bd7}.fileic.oth{background:#5b6283}
 .ev{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .ev .meta{font-size:12.5px;color:var(--muted)}
@@ -196,7 +199,9 @@ details>summary{cursor:pointer;color:var(--acc-ink);font-weight:600;min-height:3
 @media(max-width:780px){
  .app{grid-template-columns:minmax(0,1fr);background:none}
  .side{position:sticky;top:0;z-index:8;height:auto;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;padding:8px 10px;gap:2px}
- .brand{padding:0 8px 0 2px;font-size:16px}.brand small,.brand .mark{display:none}
+ .brand{padding:0 8px 0 2px;font-size:16px}.brand small{display:none}
+ .brand .mark{width:28px;height:28px;border-radius:8px}
+ .brand .mark .logoimg{width:28px;height:28px}
  .nav{display:flex;gap:2px;flex:none}.nav a{flex:none;padding:7px 10px;min-height:38px;font-size:14px;white-space:nowrap}.nav a svg{display:none}.nav a .n:empty{display:none}
  .brand{flex:none}
  .side .foot{display:none}
