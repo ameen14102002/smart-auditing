@@ -3,12 +3,6 @@
    COLOUR ledger ink #102347 · paper #f8f9fc · action ultramarine #2f4bd8 · verified green #17875a · audit-pen red #c93a2e · ruling #dde2ee
    TYPE IBM Plex Sans for the app (tabular figures for amounts); IBM Plex Serif for reports and the sign-in headline
    MOTION one drawn tick on sign-in; everything else answers an action: 120ms view fade, 200ms toasts and tabs, 600ms tick. */
-:root{--rail:#102347;--rail2:#1a3160;--acc:#2f4bd8;--acc-ink:light-dark(#2b43c4,#a5b2ff);--acc-soft:light-dark(#edf0fd,#1c2a5e);
-  --ok:#17875a;--hi:#c93a2e;--bg:light-dark(#f8f9fc,#0c1530);--sheet:light-dark(#f1f3f8,#111c3d);--card:light-dark(#ffffff,#15224a);
-  --ink:light-dark(#14203d,#e8ecf8);--muted:light-dark(#5a6482,#a7b0cf);--line:light-dark(#dde2ee,#26325e);
-  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
-  --t-fast:120ms;--t-med:200ms;--t-slow:600ms;--ease:cubic-bezier(.2,.7,.2,1);--r:10px}
-body{font-family:var(--sans);font-size:15px;letter-spacing:-.003em}
 h1,h2,h3,.brand,.kpi b{font-family:var(--sans)}
 h1{font-weight:600;letter-spacing:-.018em;line-height:1.18}
 h2{font-weight:600;letter-spacing:-.01em}h3{font-weight:600}
@@ -18,8 +12,6 @@ table,.num,.kpi b,.tag,input[type=number]{font-variant-numeric:tabular-nums lini
 
 /* brand in the rail */
 .brand{gap:11px;font:600 17px/1.15 var(--sans);letter-spacing:-.01em}
-.brand .mark{width:34px;height:34px;border-radius:9px;background:none;display:block}
-.brand .mark svg{width:34px;height:34px;display:block}
 .brand small{font:400 12px var(--sans);color:#9fb0e6;letter-spacing:0}
 .side{background:var(--rail)}.app{background:linear-gradient(to right,var(--rail) 240px,transparent 240px)}
 
@@ -30,7 +22,7 @@ table,.num,.kpi b,.tag,input[type=number]{font-variant-numeric:tabular-nums lini
 .logoimg.draw .shine{animation:sweep .9s var(--ease) .5s both}
 @keyframes logoIn{from{opacity:0;transform:scale(.82) translateY(8px)}to{opacity:1;transform:none}}
 @keyframes sweep{to{transform:translateX(130%)}}
-.brand .mark .logoimg{width:34px;height:34px}
+.brand .mark .logoimg{width:36px;height:36px}
 .auth-brand .logoimg{width:56px;height:56px}
 .auth-brand .brandrow{display:flex;align-items:center;gap:16px;position:relative}
 .auth-brand .wordmark{font:600 22px/1.1 var(--sans);letter-spacing:-.01em;color:#fff}
@@ -211,7 +203,6 @@ body.auth #main{padding:0;max-width:none}
 @media (prefers-reduced-motion:reduce){.auth-stage .auth-art{transform:none}}
 
 /* ---------- premium pass: inside the app ---------- */
-:root{--shadow:0 1px 2px rgb(16 35 71 / .05),0 4px 14px -6px rgb(16 35 71 / .10);--shadow-lg:0 1px 2px rgb(16 35 71 / .06),0 18px 40px -16px rgb(16 35 71 / .22);--r:12px}
 body:not(.auth){background:radial-gradient(ellipse 90% 50% at 60% -10%,light-dark(#e9edfb,#14224d),transparent 60%) fixed,var(--bg)}
 /* rail: deep ink, quiet active state with a green marker */
 .side{background:linear-gradient(180deg,#12275a 0%,#0c1a3d 60%,#0a1634 100%);border-right:1px solid rgb(255 255 255 / .04)}
@@ -276,6 +267,48 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0
 .empty{border-radius:14px;background:light-dark(#fbfcfe,#111c3d)}
 .seg button.on:not(.ok):not(.ex){background:var(--acc-soft);color:var(--acc-ink);font-weight:600;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--acc) 35%,transparent)}
 
+
+/* ---------- unified skin: components that were still on the v1 language ---------- */
+/* checklist rows */
+.chk{padding:16px 4px;gap:8px 14px;transition:background-color var(--t-fast)}
+.chk:hover{background:light-dark(#f6f8fd,#18265a)}
+.chk .q{letter-spacing:-.005em}
+.chk .ref{font-size:12.5px;letter-spacing:.01em}
+.seg{border-radius:9px;box-shadow:0 1px 2px rgb(16 35 71 / .05)}
+.seg button{transition:background-color var(--t-fast),color var(--t-fast)}
+/* stage stepper */
+.stepper button{border-radius:10px;box-shadow:0 1px 2px rgb(16 35 71 / .05);transition:background-color var(--t-fast),color var(--t-fast),border-color var(--t-fast),box-shadow var(--t-med)}
+.stepper button:hover{border-color:color-mix(in srgb,var(--acc) 35%,var(--line))}
+.stepper button.cur{box-shadow:0 4px 12px -4px rgb(47 75 216 / .55)}
+.stepper button.done{box-shadow:0 1px 2px rgb(23 135 90 / .15)}
+/* roadmap cards and columns */
+.rmcol{border-radius:14px;box-shadow:0 1px 2px rgb(16 35 71 / .05)}
+.rmcard{border-radius:10px;box-shadow:0 1px 2px rgb(16 35 71 / .05);transition:box-shadow var(--t-med),transform var(--t-med),border-color var(--t-fast)}
+.rmcard:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px);border-color:color-mix(in srgb,var(--acc) 25%,var(--line))}
+.rmcard p{letter-spacing:-.005em}
+/* risk register rows */
+.reg{padding:10px 4px;transition:background-color var(--t-fast);border-radius:8px}
+.reg:not(.h):hover{background:light-dark(#f6f8fd,#18265a)}
+.reg b{letter-spacing:-.005em}
+/* evidence rows */
+.ev{padding:14px 4px;transition:background-color var(--t-fast);border-radius:8px}
+.ev:hover{background:light-dark(#f6f8fd,#18265a)}
+.drop{border-radius:14px;transition:background-color var(--t-fast),border-color var(--t-fast)}
+/* bars */
+.track{border-radius:99px}
+.bar{font-weight:500}
+.bar a{font-weight:600;letter-spacing:-.005em}
+/* forms and fieldsets already carry card language; labels join the type system */
+label.f{letter-spacing:-.003em}
+label.f .hint{color:var(--muted)}
+/* file type icons: same radius language as chips */
+.fileic{border-radius:7px}
+/* legend sits on fieldset like h3 on card */
+legend{color:var(--ink)}
+/* empty and banners already premium; stack tables get the row rhythm */
+.stack tbody tr{transition:background-color var(--t-fast)}
+td.grp{letter-spacing:.02em}
+
 /* ---------- inside-app brand: hover polish, empty-state mark ---------- */
 .side .brand{cursor:pointer;user-select:none}
 .side .brand:hover .logoimg .shine{animation:sweep .7s var(--ease) both}
@@ -285,8 +318,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0
 .onboard{display:flex;align-items:center;gap:12px;margin-bottom:6px}
 .onboard .empty-mark{width:30px;height:30px;border-radius:9px}
 @media (max-width:780px){
-  .brand .mark{display:block!important;width:28px!important;height:28px!important}
-  .brand .mark .logoimg{width:28px!important;height:28px!important}
   .brand small{display:none}
   .brand span:last-child{font-size:15px;white-space:nowrap}
 }
