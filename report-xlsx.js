@@ -45,6 +45,10 @@ function procFacts(a,c,k){
       if(r.state==='bad')facts.problems.push({r:Math.abs(diff)>100000?'H':'M',t:`${RC[rk]}: ${rk==='r5'?'TDS not paid by the due date':'tax difference'} ${inr(Math.abs(diff))}`,d:RMEAN[rk]?.(r)||'',why:rk==='r5'?'Interest at 1.5% a month and possible disallowance of the expense.':'Possible tax demand, interest, or input tax credit that cannot be claimed.',todo:'See the detail sheet; explain each difference or correct the return or the books.',amt:Math.abs(diff)});
       for(const ch of (r.eng?.checks||[]).filter(x=>x.lv==='act').slice(0,8))facts.problems.push({r:'M',t:ch.t,d:ch.d,why:'',todo:'',amt:null})}
     facts.money=facts.extra.reduce((t,x)=>t+Math.abs(x.diff||0),0)}
+  if(k==='chk'){/* a checklist exception is a failed control: it must show as a problem, not vanish into an "all right" tone */
+    const ex=a.items.filter(it=>it.r==='ex');
+    for(const it of ex)facts.problems.push({r:'M',t:it.q,d:it.n||'',why:'A checklist step that did not pass is a control that did not work.',todo:'Raise an observation, fix it and re-test before reporting.',amt:null});
+    if(ex.length>3)facts.problems.push({r:'H',t:ex.length+' of '+(a.items.length)+' checklist steps did not pass',d:'',why:'More than half the steps in this procedure failed.',todo:'Repeat the whole procedure; find the root cause.',amt:null})}
   return facts}
 function flagAmt(r,f){const S=x=>R2(x.reduce((t,v)=>t+v,0));switch(f.k){
   case'noref':return S(r.bills.map(b=>Math.max(0,b.t0-b.rem)));case'over':return S(r.over.map(o=>o.excess));case'mis':return S(r.mis.map(m=>m.u.rem));
@@ -129,7 +133,7 @@ function buildReport(audits,opt={}){
   XS_FOOT=cl.map(c=>c.name).join(', ')+' · Internal audit report · '+fmtD(today());
   const SUM='1 Summary',sheets=[],procs=[];let no=3;
   const seen=new Set();for(const a of audits){const c=S.clients.find(x=>x.id===a.clientId);if(!c)continue;for(const k of (opt.only?[opt.only]:programmeOf(a))){const key=k==='chk'?a.id+k:c.id+k;if(seen.has(key))continue;seen.add(key);
-    const f=procFacts(a,c,k),obs=obsOfProc(a,k,O),ev=evOfProc(a,c,k);procs.push({a,c,k,f,obs,ev,tone:toneFor(f,obs),sheet:(no++)+' '+shortName(k,a,audits.length>1)})}}
+    const f=procFacts(a,c,k),obs=obsOfProc(a,k,O),ev=evOfProc(a,c,k);if(f.money==null)f.money=0;f.money+=obs.reduce((t,o)=>t+(+o.amount||0),0);procs.push({a,c,k,f,obs,ev,tone:toneFor(f,obs),sheet:(no++)+' '+shortName(k,a,audits.length>1)})}}
   const op=opinionAll(O,procs);
   /* 1 Summary */
   const s=new RS(SUM);s.tab='FF17875A';s.title('Internal audit report: summary',sub);
@@ -146,8 +150,8 @@ function buildReport(audits,opt={}){
       const main=[...p.f.problems,...p.obs.map(o=>({r:o.rating,t:o.title,amt:0}))].sort((x,y)=>('HML'.indexOf(x.r)-'HML'.indexOf(y.r))||((y.amt||0)-(x.amt||0)))[0];
       return[{v:p.f.name+(audits.length>1&&p.k==='chk'?' ('+p.a.title+')':''),s:'tdB'},chip(TONE[p.tone][1],{ok:'okC',warn:'warnC',bad:'badC',none:'noneC'}[p.tone]),main?.t||(p.tone==='none'?'Not done yet':'Nothing found'),p.f.problems.length+p.obs.length,p.f.money!=null?Math.round(p.f.money):'',linkTo(p.sheet,'Open')]}),{filter:true});
   s.section('Fix these first');
-  const top=[...procs.flatMap(p=>[...p.f.problems.map(x=>({...x,proc:p.f.name,sheet:p.sheet})),...p.obs.filter(o=>!p.f.problems.some(q=>sameT(q.t,o.title))).map(o=>({r:o.rating,t:o.title,todo:o.rec,amt:null,proc:p.f.name,sheet:p.sheet}))]),
-    ...O.filter(o=>!procs.some(p=>p.obs.includes(o))).map(o=>({r:o.rating,t:o.title,todo:o.rec,amt:null,proc:'Observations',sheet:'Observations'}))].filter(x=>x.r!=='L').sort((x,y)=>('HML'.indexOf(x.r)-'HML'.indexOf(y.r))||((y.amt||0)-(x.amt||0))).slice(0,15);
+  const top=[...procs.flatMap(p=>[...p.f.problems.map(x=>({...x,proc:p.f.name,sheet:p.sheet})),...p.obs.filter(o=>!p.f.problems.some(q=>sameT(q.t,o.title))).map(o=>({r:o.rating,t:o.title,todo:o.rec,amt:+o.amount||0,proc:p.f.name,sheet:p.sheet}))]),
+    ...O.filter(o=>!procs.some(p=>p.obs.includes(o))).map(o=>({r:o.rating,t:o.title,todo:o.rec,amt:+o.amount||0,proc:'Observations',sheet:'Observations'}))].filter(x=>x.r!=='L').sort((x,y)=>('HML'.indexOf(x.r)-'HML'.indexOf(y.r))||((y.amt||0)-(x.amt||0))).slice(0,15);
   if(top.length)s.table([{h:'Priority',at:'B',k:'c'},{h:'Problem',at:'C'},{h:'Money (₹)',at:'D',k:'n'},{h:'What to do',at:'E'},{h:'Procedure',at:'F'}],top.map(x=>[chip(PRI[x.r][0],PRI[x.r][1]),{v:x.t,s:'tdB'},x.amt?Math.round(x.amt):'',x.todo||'',linkTo(x.sheet,x.sheet.replace(/^\d+ /,''))]));
   else s.para('No high or medium problem was found.','okT');
   sheets.push(s.out());
@@ -228,8 +232,8 @@ function discSheetX(O,audits,SUM,procs){const x=new RS('For discussion',[2,6,24,
   for(const p of procs){if(p.tone==='none')L.push([p.f.name,'Not done yet. '+(p.f.stText||''),'','Complete before the audit is reported','','',''])
     for(const q of p.f.problems.filter(q=>q.r!=='L'&&!O.some(o=>sameT(q.t,o.title))))L.push([p.f.name,q.t+(q.d?': '+String(q.d).slice(0,300):''),q.r,q.todo||'','','',''])}
   for(const a of audits)for(const r of openNotes(a))L.push(['Review note',r.text||r.note||'','','Clear the note','',r.by||'','']);
-  x.table([{h:'#',at:'B',k:'c'},{h:'Area',at:'C',k:'b'},{h:'Point for discussion',at:'D'},{h:'Priority',at:'E',k:'c'},{h:'Our recommendation',at:'F'},{h:'Management\'s view',at:'G'},{h:'Decision / action agreed',at:'H'},{h:'Owner',at:'I'},{h:'Target date',at:'J'}],
-    L.map((r,i)=>[i+1,r[0],r[1],r[2]?chip(PRI[r[2]][0],PRI[r[2]][1]):'',r[3],{v:r[4],s:'in'},{v:'',s:'in'},{v:r[5],s:'in'},{v:r[6],s:'in'}]),{filter:true,freeze:true});
+  x.table([{h:'#',at:'B',k:'c'},{h:'Area',at:'C',k:'b'},{h:'Point for discussion',at:'D'},{h:'Priority',at:'E',k:'c'},{h:'Our recommendation',at:'F'},{h:'Management\'s view',at:'G'},{h:'Decision / action agreed',at:'H'},{h:'Owner',at:'I'},{h:'Target date',at:'J',k:'d'}],
+    L.map((r,i)=>[i+1,r[0],r[1],r[2]?chip(PRI[r[2]][0],PRI[r[2]][1]):'',r[3],{v:r[4],s:'in'},{v:'',s:'in'},{v:r[5],s:'in'},{v:r[6],s:/^\d{4}-\d{2}-\d{2}$/.test(String(r[6]||''))?'dt':'in'}]),{filter:true,freeze:true});
   if(!L.length)x.para('Nothing to discuss.','note');return x.out()}
 function docsSheet(D,SUM){const x=new RS('Documents used',[2,8,40,34,24,46,40,24,12,22]);x.title('Documents used','Every document and data source the audit relied on: what it is, the period, what was read from it and where it was used',SUM);
   x.table([{h:'ID',at:'B',k:'b'},{h:'Document',at:'C',k:'b'},{h:'What it is',at:'D'},{h:'Period covered',at:'E'},{h:'What was read',at:'F'},{h:'Used in',at:'G'},{h:'Source',at:'H'},{h:'Received',at:'I',k:'d'},{h:'Integrity (SHA-256)',at:'J'}],D.map(d=>[d.id,d.doc,d.type,d.period,d.records,d.used,d.src,d.at,(d.hash||'').slice(0,16)]),{filter:true,freeze:true});
