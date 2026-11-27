@@ -54,29 +54,28 @@ body.auth .app{display:block;background:none}
 body.auth #main{padding:0;max-width:none}
 .auth-wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);min-height:100vh;
   background-color:#0a1834;position:relative;isolation:isolate;overflow:hidden}
-/* living background: photo revealed, gliding light sweep, breathing zoom, drifting brand light, rising dust */
+/* living background: photo revealed, gliding light line, drifting green line, drifting brand light — lines move, no zoom */
 .auth-wrap::before{content:"";position:absolute;inset:-6%;z-index:-1;pointer-events:none;
   background-image:
-    linear-gradient(112deg,transparent 42%,rgb(165 255 228 / .15) 50%,transparent 58%),
+    linear-gradient(112deg,transparent 42%,rgb(165 255 228 / .18) 50%,transparent 58%),
     linear-gradient(100deg,rgb(10 24 52 / .8) 0%,rgb(10 24 52 / .45) 45%,rgb(10 24 52 / .16) 100%),
     url(auth-bg.jpg);
   background-size:260% 100%,100% 100%,cover;
   background-position:130% 0,0 0,center;
   background-repeat:no-repeat;
   filter:saturate(1.2);
-  animation:bgzoom 16s ease-in-out infinite alternate,beamsweep 8s linear infinite}
+  animation:beamsweep 9s linear infinite}
 .auth-wrap::after{content:"";position:absolute;inset:-8%;z-index:-1;pointer-events:none;
   background-image:
-    radial-gradient(ellipse 55% 45% at 76% 84%,rgb(23 135 90 / .45),rgb(23 135 90 / 0) 70%),
-    radial-gradient(ellipse 50% 42% at 16% 16%,rgb(47 75 216 / .5),rgb(47 75 216 / 0) 72%),
-    radial-gradient(circle,rgb(255 255 255 / .35) 1px,rgb(255 255 255 / 0) 1.6px);
-  background-size:100% 100%,100% 100%,72px 72px;
-  background-repeat:no-repeat,no-repeat,repeat;
-  animation:glowdrift 12s ease-in-out infinite alternate,dustrise 36s linear infinite}
-@keyframes bgzoom{from{transform:scale(1) translate3d(0,0,0)}to{transform:scale(1.14) translate3d(-3.5%,-2%,0)}}
+    linear-gradient(105deg,transparent 40%,rgb(23 135 90 / .4) 47%,rgb(23 135 90 / 0) 54%),
+    radial-gradient(ellipse 55% 45% at 76% 84%,rgb(23 135 90 / .4),rgb(23 135 90 / 0) 70%),
+    radial-gradient(ellipse 50% 42% at 16% 16%,rgb(47 75 216 / .5),rgb(47 75 216 / 0) 72%);
+  background-size:260% 100%,100% 100%,100% 100%;
+  background-repeat:no-repeat,no-repeat,no-repeat;
+  animation:greendrift 11s ease-in-out infinite alternate,glowdrift 13s ease-in-out infinite alternate}
 @keyframes beamsweep{from{background-position:130% 0,0 0,center}to{background-position:-30% 0,0 0,center}}
-@keyframes glowdrift{from{transform:translate3d(0,0,0) scale(1);opacity:.45}to{transform:translate3d(-6%,4%,0) scale(1.1);opacity:.95}}
-@keyframes dustrise{from{background-position:0 0,0 0,0 0}to{background-position:0 0,0 0,0 -72px}}
+@keyframes greendrift{from{background-position:130% 0,0 0,0 0}to{background-position:-30% 0,0 0,0 0}}
+@keyframes glowdrift{from{transform:translate3d(0,0,0);opacity:.5}to{transform:translate3d(-7%,3%,0);opacity:.95}}
 /* ---------- opening intro: book → search → logo → wording → card ---------- */
 .auth-wrap.intro .brandrow .logoimg,.auth-wrap.intro .wordmark,.auth-wrap.intro .auth-brand h1,
 .auth-wrap.intro .lede,.auth-wrap.intro .auth-brand ul,.auth-wrap.intro .foot{opacity:0}
