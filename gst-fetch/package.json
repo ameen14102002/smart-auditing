@@ -1,0 +1,16 @@
+{
+  "name": "gst-fetch",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Smart Auditing — automated GST return downloads from the GST portal via Playwright (manifest-driven). No 1Go.",
+  "scripts": {
+    "start": "node server.js",
+    "fetch": "node fetch.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "playwright": "^1.48.0"
+  }
+}

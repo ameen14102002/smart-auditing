@@ -105,12 +105,19 @@ const numIn=(id,label,v,hint)=>`<label class="f">${label}<input id="${id}" type=
 function vClientForm(c){
   const ed=!!c;c=c||{};
   setTop(ed?[['Clients','clients'],[c.name,'client-'+c.id],['Edit master']]:[['Clients','clients'],['New client']]);
-  return `<div class="head"><div class="titles"><h1>${ed?'Edit client master':'New client'}</h1><p class="sub">These details decide which audits, laws and returns apply. Use the last financial year's audited figures, in ₹ crore.</p></div></div>
+  const OD=ui.onboardDraft;
+  const odDerivable=OD&&OD.step==='done'?{industry:OD.P.industry,system:OD.P.system,biz:OD.P.biz,turnover:OD.P.turnoverCr||0,employees:OD.P.employees||0,gst:!!OD.P.gst,cash5:OD.P.cashPct<5&&OD.P.cashAmt>0}:{};
+  const draft=ui.clientFormDraft||{};
+  const base=ed?c:{...odDerivable,...draft};
+  return `<div class="head"><div class="titles"><h1>${ed?'Edit client master':'New client'}</h1><p class="sub">${ed?'These details decide which audits, laws and returns apply.':'Give the Tally XML here and everything derivable from the books is filled in — profile, compliance, findings, roadmap and checklist. Only the client master details you enter manually are left for you.'}</p></div></div>
+  ${!ed&&OD?`<div class="banner ${OD.error?'err':'ok'}" style="margin-bottom:14px">${OD.error?esc(OD.error):`${OD.P.vouchers.toLocaleString('en-IN')} vouchers read · ${OD.F.length} findings · ${OD.R.items.length} roadmap items · ${OD.CL.docs.length} documents to collect. ${OD.P.gapMonths.length?'Books have gaps in: '+esc(OD.P.gapMonths.join(', '))+'.':''} Review the pre-filled fields, enter the manual details, then save.`}</div>`:''}
+  ${!ed&&OD&&OD.step==='running'?'<div class="banner" style="margin-bottom:14px">Reading the books…</div>':''}
   <div class="grid2"><form id="clientForm">
-   <fieldset><legend>Identity</legend><div class="form"><label class="f wide">Client name<input id="cf-name" required value="${esc(c.name)}"></label><label class="f">Industry<input id="cf-ind" value="${esc(c.industry)}"></label><label class="f">Accounting system<input id="cf-sys" placeholder="e.g. Tally, Zoho Books, SAP" value="${esc(c.system)}"></label><label class="f">GSTIN<input id="cf-gstin" placeholder="e.g. 33AAACK1234F1Z5" value="${esc(c.gstin||'')}"></label></div></fieldset>
-   <fieldset><legend>Classification</legend><div class="form"><label class="f">Entity type<select id="cf-type">${opts(ENT,c.type||'private')}</select></label><label class="f">Group position<select id="cf-rel">${opts(REL,c.rel||'none')}</select></label><label class="f">Nature of business<select id="cf-biz">${opts(BIZ,c.biz||'trading')}</select></label><label class="f">Regulated by<select id="cf-reg">${opts(REG,c.reg||'none')}</select></label><label class="f wide">Cost records sector<select id="cf-cost">${opts(COST,c.cost||'none')}</select></label></div></fieldset>
-   <fieldset><legend>Last financial year (₹ crore)</legend><div class="form">${numIn('cf-to','Turnover / gross receipts',c.turnover)}${numIn('cf-pu','Paid-up capital',c.paidup)}${numIn('cf-nw','Net worth',c.networth,'Capital + reserves')}${numIn('cf-np','Net profit before tax',c.profit)}${numIn('cf-bo','Peak bank / FI borrowings',c.borrow)}${numIn('cf-de','Deposits outstanding',c.deposits)}${numIn('cf-pt','Turnover under cost records',c.costTurnover,'Only for a cost-records sector')}${numIn('cf-ct','LLP contribution (₹ lakh)',c.contribution,'Only for LLPs')}${numIn('cf-em','Employees',c.employees)}</div></fieldset>
-   <fieldset><legend>Other facts</legend><label class="cb"><input type="checkbox" id="cf-gst" ${c.gst!==false?'checked':''}>GST registered</label><label class="cb"><input type="checkbox" id="cf-cash" ${c.cash5?'checked':''}>Cash receipts and payments each within 5% of totals</label><label class="cb"><input type="checkbox" id="cf-intl" ${c.intl?'checked':''}>International transactions with group companies</label></fieldset>
+   ${!ed?`<label class="drop" data-drop="clientxml"><b>${OD&&OD.step==='done'?'Re-read the Tally XML':'Drop the Tally XML day book here'}</b><span class="small">Tally → Day Book → Export (XML), one per year, dropped together. The engine reads every voucher and auto-fills everything derivable from the books — industry, system, nature of business, turnover, employees, GST/TDS, compliance, findings, roadmap and checklist. You only enter the client master details that are not in the books (name, GSTIN, entity type, group position, regulated by, cost records).</span><input type="file" data-file="clientxml" accept=".xml" multiple hidden></label>`:''}
+   <fieldset><legend>Identity</legend><div class="form"><label class="f wide">Client name<input id="cf-name" required value="${esc(base.name)}"></label><label class="f">Industry<input id="cf-ind" value="${esc(base.industry)}"></label><label class="f">Accounting system<input id="cf-sys" placeholder="e.g. Tally, Zoho Books, SAP" value="${esc(base.system)}"></label><label class="f">GSTIN<input id="cf-gstin" placeholder="e.g. 33AAACK1234F1Z5" value="${esc(base.gstin||'')}"></label></div></fieldset>
+   <fieldset><legend>Classification</legend><div class="form"><label class="f">Entity type<select id="cf-type">${opts(ENT,base.type||'private')}</select></label><label class="f">Group position<select id="cf-rel">${opts(REL,base.rel||'none')}</select></label><label class="f">Nature of business<select id="cf-biz">${opts(BIZ,base.biz||'trading')}</select></label><label class="f">Regulated by<select id="cf-reg">${opts(REG,base.reg||'none')}</select></label><label class="f wide">Cost records sector<select id="cf-cost">${opts(COST,base.cost||'none')}</select></label></div></fieldset>
+   <fieldset><legend>Last financial year (₹ crore)</legend><div class="form">${numIn('cf-to','Turnover / gross receipts',base.turnover)}${numIn('cf-pu','Paid-up capital',base.paidup)}${numIn('cf-nw','Net worth',base.networth,'Capital + reserves')}${numIn('cf-np','Net profit before tax',base.profit)}${numIn('cf-bo','Peak bank / FI borrowings',base.borrow)}${numIn('cf-de','Deposits outstanding',base.deposits)}${numIn('cf-pt','Turnover under cost records',base.costTurnover,'Only for a cost-records sector')}${numIn('cf-ct','LLP contribution (₹ lakh)',base.contribution,'Only for LLPs')}${numIn('cf-em','Employees',base.employees)}</div></fieldset>
+   <fieldset><legend>Other facts</legend><label class="cb"><input type="checkbox" id="cf-gst" ${base.gst!==false?'checked':''}>GST registered</label><label class="cb"><input type="checkbox" id="cf-cash" ${base.cash5?'checked':''}>Cash receipts and payments each within 5% of totals</label><label class="cb"><input type="checkbox" id="cf-intl" ${base.intl?'checked':''}>International transactions with group companies</label></fieldset>
    <div class="row"><button class="btn" type="submit">${ed?'Save changes':'Save client and plan'}</button><a class="btn ghost" href="#${ed?'client-'+c.id:'clients'}">Cancel</a></div></form>
   <div><div class="panel sticky" id="livePreview"></div></div></div>`;
 }
@@ -119,10 +126,18 @@ function formClient(){
 }
 function livePreview(){
   const p=$('#livePreview');if(!p)return;const c=formClient(),L=applicability(c),y=L.filter(a=>a.st==='yes'),ch=L.filter(a=>a.st==='check'),risks=suggestedRisks(c);
+  const OD=ui.onboardDraft;let extra='';
+  if(OD&&OD.step==='done'){const top=OD.R.items.slice(0,6);
+    extra=`<h2 style="margin:16px 0 4px">From the books — roadmap</h2><p class="small muted" style="margin:0 0 8px">${OD.R.items.length} items, findings first. ${OD.CL.docs.length} documents to collect.</p>
+    ${top.map((it,i)=>`<div class="row small" style="padding:5px 0;border-bottom:1px solid var(--line);gap:8px;flex-wrap:nowrap"><span class="tag ${it.prio===1?'r':it.prio===2?'y':'n'}" style="min-width:4.6em;justify-content:center">${it.prio===1?'1st':it.prio===2?'2nd':'3rd'}</span><span>${esc(it.title.slice(0,70))}</span></div>`).join('')}
+    ${OD.R.items.length>6?`<p class="small muted" style="margin:6px 0 0">+${OD.R.items.length-6} more on save.</p>`:''}
+    <h2 style="margin:16px 0 4px">From the books — checklist</h2><p class="small muted" style="margin:0 0 8px">${OD.F.length} depth findings · audit work, standards and controls for this line of business.</p>
+    ${OD.F.slice(0,4).map(f=>`<div class="row small" style="padding:5px 0;border-bottom:1px solid var(--line);gap:8px;flex-wrap:nowrap"><span class="tag ${f.rating==='H'?'r':f.rating==='M'?'y':'n'}" style="min-width:4.6em;justify-content:center">${f.rating==='H'?'High':f.rating==='M'?'Med':'Low'}</span><span>${esc(f.title.slice(0,64))}</span></div>`).join('')}
+    ${OD.F.length>4?`<p class="small muted" style="margin:6px 0 0">+${OD.F.length-4} more findings on save.</p>`:''}`;}
   p.innerHTML=`<h2 style="margin:0">What will apply</h2><p class="small muted" style="margin:4px 0 12px">Updates as you type. ${isSmall(c)?'<b>Small company</b> at these figures. ':''}</p>
    <div class="row" style="gap:6px;margin-bottom:10px"><span class="tag r">${y.length} apply</span>${ch.length?`<span class="tag y">${ch.length} to check</span>`:''}<span class="tag n">${L.length-y.length-ch.length} not applicable</span></div>
    ${[...y,...ch].map(a=>`<div class="row small" style="padding:5px 0;border-bottom:1px solid var(--line);gap:8px;flex-wrap:nowrap"><span class="tag ${a.st==='yes'?'b':'y'}" style="min-width:4.6em;justify-content:center">${a.st==='yes'?'Applies':'Check'}</span><span>${esc(a.name)}</span></div>`).join('')}
-   <p class="small muted" style="margin:12px 0 0">Audit plan: ${risks.map(r=>esc(TEMPLATES[r.t].name)).join(', ')}.</p>`;
+   <p class="small muted" style="margin:12px 0 0">Audit plan: ${risks.map(r=>esc(TEMPLATES[r.t].name)).join(', ')}.</p>${extra}`;
 }
 
 /* ---------- client workspace ---------- */
@@ -424,6 +439,11 @@ document.addEventListener('change',e=>{
 });
 async function handleFiles(kind,files,i){
   const a=A(),c=C();if(!files||!files.length)return;
+  if(kind==='clientxml'){try{ui.onboardDraft={step:'running'};render();
+      const D=await onboardRun(files);D.texts=[];for(const f of files)if(/\.xml$/i.test(f.name))D.texts.push(decodeBuf(await f.arrayBuffer()));
+      D.step='done';ui.onboardDraft=D;ui.clientFormDraft=null;render();toast('Books read — '+D.F.length+' findings, '+D.R.items.length+' roadmap items ready to save')}
+    catch(e){ui.onboardDraft={step:'idle',error:e.message||String(e)};render();toast(e.message||String(e))}
+    return}
   if(kind==='audit')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,purpose:'Audit file'});
   if(kind==='item')return uploadFiles(files,{clientId:a.clientId,auditId:a.id,item:+i,purpose:'Check '+(+i+1)});
   if(['books','brsbank','brsbook','pstmt','pbook','stock','far','payreg','as26','settle'].includes(kind))return procFiles(c,kind,files,i);
@@ -435,19 +455,28 @@ async function handleFiles(kind,files,i){
   if(kind==='roadmap'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no rows under the header.');const items=parseRoadmap(rows),R=c.roadmap||{fy:fyNow(),items:[]};await saveRoadmap(c,{...R,items:[...R.items,...items],uploadedAt:today(),uploadFile:f.name});toast(items.length+' roadmap items added from '+f.name)}catch(er){toast(er.message)}return}
   if(kind==='ledger'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no data rows.');const T=runTests(rows,f.name);let evId='';try{evId=(await uploadFiles([f],{clientId:a.clientId,auditId:a.id,purpose:'Ledger used for data tests'}))[0]||''}catch(er){}const cur=S.audits.find(x=>x.id===a.id)||a;await put('audits',a.id,{...cur,tests:{...T,evidenceId:evId},stage:cur.stage==='Planned'?'Fieldwork':cur.stage});toast(T.rows+' rows tested')}catch(er){toast(er.message)}}
 }
-document.addEventListener('input',e=>{if(e.target.closest('#clientForm'))livePreview();if(e.target.id==='q')search(e.target.value)});
+document.addEventListener('input',e=>{if(e.target.closest('#clientForm')){captureClientDraft();livePreview()}if(e.target.id==='q')search(e.target.value)});
+function captureClientDraft(){try{const f=formClient();if(f.name||f.gstin||f.type!=='private'||f.biz!=='trading'||f.reg!=='none'||f.cost!=='none'||f.turnover||f.employees){ui.clientFormDraft=f}}catch(e){}}
 document.addEventListener('dragover',e=>{const d=e.target.closest('.drop');if(d){e.preventDefault();d.classList.add('over')}});
 document.addEventListener('dragleave',e=>{const d=e.target.closest('.drop');if(d)d.classList.remove('over')});
 document.addEventListener('drop',e=>{const d=e.target.closest('.drop');if(!d)return;e.preventDefault();d.classList.remove('over');handleFiles(d.dataset.drop,e.dataTransfer.files)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#searchRes').hidden=true;if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$('#q').focus()}});
-document.addEventListener('submit',e=>{
+document.addEventListener('submit',async e=>{
   e.preventDefault();const id=e.target.id;
   if(id==='loginForm'){sb.auth.signInWithPassword({email:val('lg-email'),password:$('#lg-pass').value}).then(({error})=>{if(error)toast(error.message==='Email not confirmed'?'Confirm your email first (check your inbox).':error.message);else{mustSignIn=false;(ws?Promise.resolve():afterLogin()).then(()=>go('home'))}});return}
   if(id==='wsCreate'){sb.rpc('create_workspace',{ws_name:val('ws-name')}).then(async({error})=>{if(error)return toast(error.message);await afterLogin();go('home')});return}
   if(id==='wsJoin'){sb.rpc('join_workspace',{code:val('ws-code')}).then(async({data,error})=>{if(error)return toast(error.message.includes('join code')?'No workspace has that join code':error.message);store.set('sa-ws',data);await afterLogin();go('home')});return}
   if(id==='clientForm'){const ex=ui.view==='edit'?C():null,cid=ex?ex.id:nid(),m=formClient();if(!m.name)return toast('Enter the client name');
-    put('clients',cid,{...(ex||{createdAt:new Date().toISOString(),risks:suggestedRisks(m)}),...m});
-    if(!ex){ui.lastId=cid;ui.ctab='overview';toast('Client saved; plan set from what applies. Next: generate the roadmap.')}else toast('Client master updated');
+    const OD=ui.onboardDraft;const rec={...(ex||{createdAt:new Date().toISOString(),risks:suggestedRisks(m)}),...m};
+    if(!ex&&OD&&OD.step==='done'){/* everything derivable from the books rides on the client master */
+      rec.roadmap=OD.R;
+      rec.onboard={profile:OD.P,checklist:OD.CL,compliance:OD.G,findings:OD.F,docs:OD.CL.docs,at:new Date().toISOString()};
+      /* stash the books for the procedures (same client FY doc) */
+      try{if(OD.texts&&OD.texts.length){const V=onboardParse(OD.texts),L=ledgersFromBooks(V);await savep({...pOpen({id:cid}),led:{file:OD.P.files.join(', '),at:new Date().toISOString(),...L}})}}catch(e){console.warn('books stash',e)}
+      /* depth findings become open observations */
+      for(const f of OD.F){if(f.rating==='L')continue;await put('observations',nid(),{id:nid(),clientId:cid,auditId:'',title:f.title,rating:f.rating,status:'Open',condition:f.plain,criteria:'Books and vouchers should support every entry and cover every period.',cause:f.why,effect:'If left untested: '+f.why,rec:'Cover in the first roadmap slot: '+f.title,response:'',owner:'',due:'',amount:0,evidence:[],createdAt:new Date().toISOString(),fromOnboard:true})}}
+    put('clients',cid,rec);
+    if(!ex){ui.lastId=cid;ui.ctab='overview';ui.onboardDraft=null;ui.clientFormDraft=null;toast(OD&&OD.step==='done'?'Client created from the books · '+OD.F.filter(f=>f.rating!=='L').length+' findings · roadmap and checklist ready':'Client saved; plan set from what applies. Next: generate the roadmap.')}else toast('Client master updated');
     return go('client-'+cid)}
   if(id==='auditForm')return newAudit(val('af-client'),val('af-t'),val('af-period'),val('af-due'));
   if(id==='addItemForm'){const a=A(),q=val('newItem');if(q)put('audits',a.id,{...a,items:[...a.items,{q,ref:'Added by auditor',r:'',n:''}]});return}
