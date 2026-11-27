@@ -109,9 +109,11 @@ document.addEventListener('pointermove',e=>{const st=document.querySelector('.au
 try{if(new URLSearchParams(location.search).get('intro')==='1'){sessionStorage.removeItem('sa-intro-seen');localStorage.removeItem('sa-auth-seen')}}catch(e){}
 const INTRO_BOOK_IMG=`<img src="intro-book.png?v=1" alt="" draggable="false">`;
 const INTRO_MAG_IMG=`<img src="intro-mag.png?v=1" alt="" draggable="false">`;
-let _introTimers=[],_introSkip=null;
+let _introTimers=[],_introSkip=null,_introActive=false,_introStart=0,_flyDone=false,_fxDone=false;
+const _fxHTML=()=>`<div class="i-book">${INTRO_BOOK_IMG}</div><div class="i-mag">${INTRO_MAG_IMG}</div><div class="i-logo"><img src="logo-3d.png?v=3" alt=""></div><div class="i-shine"></div>`;
+const _splitH1=w=>{const h1=w.querySelector('.auth-brand h1');if(h1&&!h1.querySelector('.w'))h1.innerHTML=h1.textContent.trim().split(/\s+/).map((word,i)=>`<span class="w" style="--i:${i}">${word}</span>`).join(' ')};
 function finishIntro(){
-  _introTimers.forEach(clearTimeout);_introTimers=[];
+  _introActive=false;_introTimers.forEach(clearTimeout);_introTimers=[];
   if(_introSkip){document.removeEventListener('click',_introSkip);document.removeEventListener('keydown',_introSkip);_introSkip=null}
   const wrap=document.querySelector('.auth-wrap.intro');
   try{sessionStorage.setItem('sa-intro-seen','1');localStorage.setItem('sa-auth-seen','1')}catch(e){}
@@ -121,39 +123,42 @@ function finishIntro(){
   const fx=document.getElementById('intro-fx');if(fx)fx.remove();
 }
 function startIntro(){
-  const wrap=document.querySelector('.auth-wrap');
-  if(!wrap||wrap.dataset.intro==='1'||!introShouldPlay())return;
-  wrap.dataset.intro='1';
-  const h1=wrap.querySelector('.auth-brand h1');
-  if(h1&&!h1.querySelector('.w')){
-    h1.innerHTML=h1.textContent.trim().split(/\s+/).map((w,i)=>`<span class="w" style="--i:${i}">${w}</span>`).join(' ');
-  }
-  const fx=document.createElement('div');
-  fx.id='intro-fx';
-  fx.innerHTML=`<div class="i-book">${INTRO_BOOK_IMG}</div><div class="i-mag">${INTRO_MAG_IMG}</div><div class="i-logo"><img src="logo-3d.png?v=3" alt=""></div><div class="i-shine"></div>`;
-  wrap.appendChild(fx);
-  wrap.classList.add('intro');
-  const at=(ms,fn)=>_introTimers.push(setTimeout(()=>{if(wrap.isConnected&&wrap.classList.contains('intro'))fn()},ms));
+  /* re-render-safe: if an intro is already running, the tick loop below re-attaches
+     to whatever .auth-wrap currently exists — a render that rebuilds #main cannot kill it */
+  if(_introActive)return;
+  if(!introShouldPlay())return;
+  const wrap=document.querySelector('.auth-wrap');if(!wrap)return;
+  _introActive=true;_introStart=performance.now();_flyDone=false;_fxDone=false;
+  _splitH1(wrap);
   _introSkip=()=>finishIntro();
   document.addEventListener('click',_introSkip);
   document.addEventListener('keydown',_introSkip);
-  at(80,()=>wrap.classList.add('st-book'));
-  at(1500,()=>wrap.classList.add('st-mag'));
-  at(2200,()=>wrap.classList.add('st-search'));
-  at(5300,()=>wrap.classList.add('st-logo'));
-  at(6500,()=>{
-    wrap.classList.add('st-fly');
-    const logo=fx.querySelector('.i-logo'),target=wrap.querySelector('.brandrow .logoimg');
-    if(!logo||!target)return;
-    const from=logo.getBoundingClientRect(),to=target.getBoundingClientRect();
-    const dx=(to.left+to.width/2)-(from.left+from.width/2);
-    const dy=(to.top+to.height/2)-(from.top+from.height/2);
-    const s=to.width/Math.max(1,from.width);
-    logo.style.transform=`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) translate(-50%,-50%) scale(${s.toFixed(4)})`;
-  });
-  at(7900,()=>{wrap.classList.add('st-landed');wrap.classList.add('st-words');_introTimers.push(setTimeout(()=>{const f=document.getElementById('intro-fx');if(f)f.remove()},450))});
-  at(11400,()=>wrap.classList.add('st-card'));
-  at(12600,()=>finishIntro());
+  const STAGES=[[80,'st-book'],[1500,'st-mag'],[2200,'st-search'],[5300,'st-logo'],[6500,'st-fly'],[7900,'st-landed'],[7900,'st-words'],[8350,'fxrm'],[11400,'st-card'],[12600,'fin']];
+  const tick=()=>{
+    if(!_introActive)return;
+    const w=document.querySelector('.auth-wrap');
+    if(!w)return;
+    if(w.dataset.intro!=='1'){w.dataset.intro='1';w.classList.add('intro');_splitH1(w)}
+    let fx=document.getElementById('intro-fx');
+    if(!fx&&!_fxDone){fx=document.createElement('div');fx.id='intro-fx';fx.innerHTML=_fxHTML();w.appendChild(fx)}
+    const el=performance.now()-_introStart;
+    for(const [at,cls] of STAGES){if(el<at)break;
+      if(cls==='fin'){finishIntro();return}
+      if(cls==='fxrm'){const f=document.getElementById('intro-fx');if(f)f.remove();_fxDone=true;continue}
+      if(cls==='st-fly'&&_flyDone)continue;
+      w.classList.add(cls);
+      if(cls==='st-fly'){
+        _flyDone=true;
+        const logo=fx&&fx.querySelector('.i-logo'),target=w.querySelector('.brandrow .logoimg');
+        if(logo&&target){const from=logo.getBoundingClientRect(),to=target.getBoundingClientRect();
+          const dx=(to.left+to.width/2)-(from.left+from.width/2),dy=(to.top+to.height/2)-(from.top+from.height/2);
+          const s=to.width/Math.max(1,from.width);
+          logo.style.transform=`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) translate(-50%,-50%) scale(${s.toFixed(4)})`}}
+    }
+    if(el>=12600){finishIntro();return}
+    _introTimers.push(setTimeout(tick,40))
+  };
+  _introTimers.push(setTimeout(tick,40))
 }
 /* ---------- after every render: auth layout, view fade, ticks ---------- */
 const _render0=render;let _lastView='';
