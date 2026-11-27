@@ -243,15 +243,15 @@ function rcCoverage(d){const fm=fyMonths(d.fy),has=(s,m)=>s==='bS'||s==='bP'?!!d
 function rcHave(d){const fm=fyMonths(d.fy),cnt=s=>{if(s==='g1'||s==='g2b'||s==='g3b')return Object.keys(d[s]||{}).filter(m=>fm.includes(m)).length;return 0};
   return {g1:cnt('g1'),g2b:cnt('g2b'),g3b:cnt('g3b'),hasAny:cnt('g1')+cnt('g2b')+cnt('g3b')>0}}
 function fetchPanel(c,d){
-  const can=mode==='supa',fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),sel=ui.fetchSel||{items:['GSTR1','GSTR2B','GSTR3B'],months:def.length?def:fm.slice(0,1)};
-  const got=rcHave(d);
-  return `<div class="panel"><h3>${ic('down')}Fetch GST returns</h3><p class="small muted" style="margin:-4px 0 8px">Click to open the GST portal's return downloads for this client, one per return and month. Download each file it gives you, drop it into the portal-files box on the left, and Smart Auditing reads and matches it here — for any volume, long or short. No separate app, no handoff: the matching is done in this app.</p>
-   <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-fetchitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
+  const fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),sel=ui.fetchSel||{items:['GSTR1','GSTR2B','GSTR3B'],months:def.length?def:fm.slice(0,1)};
+  const got=rcHave(d),needGst=sel.items.some(i=>i!=='TDS');
+  return `<div class="panel"><h3>${ic('down')}Fetch from the portals</h3><p class="small muted" style="margin:-4px 0 8px">Click to open the portal downloads for this client — GST returns (GSTR-1, 2B, 3B) and TDS challans. Download each file it gives you, drop it into the matching box on the left, and Smart Auditing reads and matches it here — for any volume, long or short. No separate app, no handoff: the matching is done in this app.</p>
+   <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B'],['TDS','TDS challans']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-fetchitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
    <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-fetchmonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
-   ${!c.gstin?`<p class="small"><span class="tag y">GSTIN needed</span> Add the client's GSTIN in the client master first.</p>`:''}
-   <div class="row"><button class="btn" data-act="fetchStart" ${can&&!c.gstin?'disabled':''}>${ic('down')}Fetch GST returns</button><span class="small">${sel.items.length} return${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
+   ${needGst&&!c.gstin?`<p class="small"><span class="tag y">GSTIN needed</span> Add the client's GSTIN in the client master to fetch the GST returns.</p>`:''}
+   <div class="row"><button class="btn" data-act="fetchStart" ${needGst&&!c.gstin?'disabled':''}>${ic('down')}Fetch from the portals</button><span class="small">${sel.items.length} item${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
    ${got.hasAny?`<p class="small muted" style="margin:6px 0 0">Already in the app: ${got.g1} GSTR-1, ${got.g2b} GSTR-2B, ${got.g3b} GSTR-3B month-sets.</p>`:''}
-   <p class="small muted" style="margin:6px 0 0"><b>What to download:</b> GSTR-1 as JSON (or ZIP of JSON) · GSTR-2B as Excel or JSON · GSTR-3B as JSON, or the 3B summary template CSV. For 1,000+ invoices the app reads every invoice — drop the whole file in, it matches them all.</p></div>`}
+   <p class="small muted" style="margin:6px 0 0"><b>What to download:</b> GSTR-1 as JSON (or ZIP of JSON) · GSTR-2B as Excel or JSON · GSTR-3B as JSON, or the 3B summary template CSV · TDS challans from TRACES (CSV/Excel). For 1,000+ invoices the app reads every invoice — drop the whole file in, it matches them all.</p></div>`}
 
 function reconTab(c){
   const d=rcOpen(c),cur=Object.keys(RC).includes(ui.rtab)?ui.rtab:'data';
@@ -341,11 +341,12 @@ function mandCard(c){
    the browser. The user signs in to the portal (once, in their own browser),
    downloads each file, and drops it into the portal-files box — the app then
    reads and matches it in-app, for any invoice volume (long or short). */
-function gstDownloadUrls(c,items,months){
+function portalDownloadUrls(c,items,months){
   const gstin=(c.gstin||'').replace(/\s/g,'').toUpperCase();
   const base='https://gst.gov.in';
   const urls=[];
   for(const it of items){
+    if(it==='TDS'){urls.push({it,m:'',url:'https://traces.incometax.gov.in'});continue}
     for(const m of months){
       const [fy,mm]=m.split('-');
       if(it==='GSTR1')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-1&action=download`});
@@ -361,11 +362,11 @@ async function fetchStart(){
   const months=[...document.querySelectorAll('[data-fetchmonth]:checked')].map(x=>x.dataset.fetchmonth).sort();
   ui.fetchSel={items,months};
   if(!items.length||!months.length)return toast('Choose what to fetch and at least one month.');
-  if(!isGstin(c.gstin))return toast("Add the client's GSTIN in the client master first.");
-  const urls=gstDownloadUrls(c,items,months);
+  if(items.some(i=>i!=='TDS')&&!isGstin(c.gstin))return toast("Add the client's GSTIN in the client master to fetch the GST returns.");
+  const urls=portalDownloadUrls(c,items,months);
   /* open the portal download pages; the browser handles sign-in and the download.
-     Each returns a file the user drops back into the portal-files box. */
-  toast(`Opening ${urls.length} ${urls.length===1?'download':'downloads'} from the GST portal`);
+     Each returns a file the user drops back into the matching box (portal files for GST, TDS box for challans). */
+  toast(`Opening ${urls.length} ${urls.length===1?'download':'downloads'} from the portals`);
   for(let i=0;i<urls.length;i++){setTimeout(()=>{const w=window.open(urls[i].url,'_blank','noopener');if(!w)toast('Pop-up blocked for one download — allow pop-ups for this site and try again.')},i*600)}
   render();
 }
