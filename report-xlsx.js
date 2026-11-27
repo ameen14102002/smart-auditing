@@ -50,8 +50,6 @@ function procFacts(a,c,k){
     for(const it of ex)facts.problems.push({r:'M',t:it.q,d:it.n||'',why:'A checklist step that did not pass is a control that did not work.',todo:'Raise an observation, fix it and re-test before reporting.',amt:null});
     if(ex.length>3)facts.problems.push({r:'H',t:ex.length+' of '+(a.items.length)+' checklist steps did not pass',d:'',why:'More than half the steps in this procedure failed.',todo:'Repeat the whole procedure; find the root cause.',amt:null})}
   return facts}
-/* observation money counts as money at risk for the procedure */
-const addObsMoney=f=>{if(f.money==null)f.money=0;return f};
 function flagAmt(r,f){const S=x=>R2(x.reduce((t,v)=>t+v,0));switch(f.k){
   case'noref':return S(r.bills.map(b=>Math.max(0,b.t0-b.rem)));case'over':return S(r.over.map(o=>o.excess));case'mis':return S(r.mis.map(m=>m.u.rem));
   case'adv':return S(r.pool.filter(u=>r.ageOf(u)>90).map(u=>u.rem));case'old':return S(r.bills.filter(b=>b.rem>1&&r.ageOf(b)>180).map(b=>b.rem));case'misref':return S(r.bills.filter(b=>b.misref).map(b=>b.amt));
