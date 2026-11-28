@@ -52,7 +52,7 @@ function procFacts(a,c,k){
   return facts}
 function flagAmt(r,f){const S=x=>R2(x.reduce((t,v)=>t+v,0));switch(f.k){
   case'noref':return S(r.bills.map(b=>Math.max(0,b.t0-b.rem)));case'over':return S(r.over.map(o=>o.excess));case'mis':return S(r.mis.map(m=>m.u.rem));
-  case'after':return R2(r.after?.amt||0);case'nontrade':return null;
+  case'after':return R2(r.after?.amt||0);case'tdsfull':return R2(r.pool.filter(u=>u.rem>1&&/\btds\b/i.test((u.oth||'')+' '+(u.vno||'')+' '+(u.nar||''))).reduce((t,u)=>t+u.rem,0));case'nontrade':return null;
   case'adv':return S(r.pool.filter(u=>r.ageOf(u)>90).map(u=>u.rem));case'old':return S(r.bills.filter(b=>b.rem>1&&r.ageOf(b)>180).map(b=>b.rem));case'misref':return S(r.bills.filter(b=>b.misref).map(b=>b.amt));
   case'else':return S((r.elsewhere||[]).map(x=>x.amt));case'near':return S(r.bills.filter(b=>b.diff).map(b=>Math.abs(b.diff)));case'open':return S(r.opening.map(o=>o.amt));default:return null}}
 const sameT=(f,o)=>f===o||String(f).replace(/^(Sales|Purchases): /,'')===o;

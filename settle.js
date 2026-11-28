@@ -100,6 +100,10 @@ function stFlags(r){
     cr:'Entries are recorded on the date they happen.',e:S?'Receipts dated ahead make customers look paid before the money comes.':'Payments dated ahead make suppliers look paid before the money goes; the outstanding in Tally is understated until then.',rec:`Confirm with the client what the later-dated entries are (scheduled or post-dated ${W.sts}); record each on the day it is made.`});
   if(r.nonTrade?.length)F.push({k:'nontrade',r:'L',t:`${pl(r.nonTrade.length,'expense or loan ledger','expense and loan ledgers')} kept bill-wise left out of the ${W.p} ageing`,c:r.nonTrade.slice(0,15).map(x=>`${x.party} (${inr(Math.abs(R2(x.dr-x.cr)))} ${x.dr>=x.cr?'Dr':'Cr'})`).join('; ')+(r.nonTrade.length>15?' …':''),
     cr:`Only ${W.p}s are aged; expenses, rent, loans and staff costs are not ${W.p} balances.`,e:'Left in, their payments would show as advances to suppliers and their bills as amounts owed to trade creditors.',rec:'Review these ledgers on their own (expense provisions, loan schedule); keep bill-wise details only where needed.'});
+  /* TDS deducted, but the bill was paid in full: the TDS is left over as an excess with the supplier (owner: Icube, ₹3,808) */
+  {const openP=new Set(r.bills.filter(b=>b.rem>1).map(b=>b.party)),T=r.pool.filter(u=>u.rem>1&&/\btds\b/i.test((u.oth||'')+' '+(u.vno||'')+' '+(u.nar||''))&&!openP.has(u.party));
+   if(T.length&&!S)F.push({k:'tdsfull',r:'M',t:`${pl(T.length,'supplier','suppliers')} paid in full although TDS was deducted (${inr(R2(T.reduce((t,u)=>t+u.rem,0)))})`,c:T.slice(0,12).map(u=>`${u.party}: TDS ${inr(u.rem)} (${u.vt} ${u.vno||''}, ${fmtD(u.d)})`).join('; ')+(T.length>12?' …':''),
+     cr:'The supplier is paid the bill less the TDS deducted; the TDS goes to the government (Income-tax Act 2025 s.393; old ss.194C / 194J).',e:'The supplier got the TDS amount twice: once in the payment and once as a credit in Form 26AS. The excess sits as a debit balance in the supplier\'s ledger.',rec:'Recover the excess from the supplier, or adjust it against the next bill; check that the TDS was deposited and the return filed.'})}
   return F}
 
 /* ---------- screen ---------- */
