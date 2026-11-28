@@ -25,7 +25,7 @@ jobs:
       - name: Collect site files
         run: |
           mkdir -p _site
-          cp index.html styles.css logic.js pdfrows.js ui.js vouching.js recon.js procs.js follow.js quality.js more.js visits.js settle-engine.js settle.js export.js xlsxsa.js gstengine.js gstlink.js report-xlsx.js rectify.js onboard.js knowledge.js design.js design.css logo-3d.png auth-bg.jpg intro-book.png intro-mag.png .nojekyll _site/
+          cp index.html styles.css logic.js pdfrows.js ui.js vouching.js recon.js procs.js follow.js quality.js more.js visits.js settle-engine.js settle.js export.js xlsxsa.js gstengine.js gstlink.js report-xlsx.js ledger-engine.js ledger.js rectify.js onboard.js knowledge.js design.js design.css logo-3d.png auth-bg.jpg intro-book.png intro-mag.png .nojekyll _site/
       - name: Pack the portal helper (download link in the app)
         run: |
           cd gst-fetch && zip -r ../_site/portal-helper.zip . -x 'test/*' 'node_modules/*' '.gitignore'

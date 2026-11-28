@@ -20,3 +20,7 @@ The links between the two apps:
 - **One sign-in and one client master**: edge function `supabase/functions/onego-bridge` (verify_jwt off; it checks the 1Go
   sign-in and `my_access`, including `audit`, on 1Go's server). Deploy it after any change.
 - **Access**: only the 1Go owner and users the owner switched Smart Auditing on for (1Go › Users) see the tile or can use the bridge.
+
+Ledger scrutiny (28 Nov 2026): audit type `ls` and procedure `ls` (ledger-engine.js pure engine, ledger.js screen and hooks);
+the vouchers sit in their own collection `lsdata`; tests run up to the audit's ageing date (stAsOf). Law references follow the
+Income-tax Act, 2025 from 1 Apr 2026 (TDS s.393; rates and limits unchanged), with the old 1961 sections named alongside.

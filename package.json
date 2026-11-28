@@ -4,7 +4,7 @@
   "private": true,
   "description": "Internal audit workbench for Indian CA firms (static site on GitHub Pages, Supabase backend).",
   "scripts": {
-    "test": "node --test tests/rectify.test.js tests/settle-asof.test.js tests/pdfrows.test.js",
+    "test": "node --test tests/rectify.test.js tests/settle-asof.test.js tests/pdfrows.test.js tests/ledger.test.js",
     "check": "for f in *.js; do node --check \"$f\" || exit 1; done && echo 'All JS files parse OK'"
   },
   "engines": {
