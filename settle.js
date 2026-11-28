@@ -15,7 +15,9 @@ PK.splice(PK.indexOf('drs'),0,'settle');
 async function settleImport(c,file,text){
   const D=SETTLE.parse(text);if(!D.P.length)throw new Error('No sales, purchase, receipt or payment entries with parties were found in this Tally file.');
   const d=pOpen(c);
-  await savep({...d,settle:{file:file.name,at:new Date().toISOString(),from:D.from,to:D.to,P:D.P.slice(0,80000),X:D.X.slice(0,20000),stats:D.stats,opt:d.settle?.opt||{},v:2}});
+  /* the same Day Book also gives the debtors, creditors and bank ledgers (Debtors, Creditors, BRS) when no books were imported there */
+  let led=d.led&&!d.led.fromSettle?d.led:null;if(!led){try{const L=ledgersFromBooks(parseLedgerEntries(text));if(Object.keys(L.dr).length||Object.keys(L.cr).length||Object.keys(L.banks).length)led={file:file.name,at:new Date().toISOString(),...L}}catch(e){}}
+  await savep({...d,...(led?{led}:{}),settle:{file:file.name,at:new Date().toISOString(),from:D.from,to:D.to,P:D.P.slice(0,80000),X:D.X.slice(0,20000),stats:D.stats,opt:d.settle?.opt||{},v:2}});
   _stMemo={};return D.P}
 let _stMemo={};
 /* the ageing date (owner, 28 Nov 2026): the day the work is done, or the end of the month chosen; never a date after today, so
@@ -174,9 +176,20 @@ const _progRepS=programmeReport;programmeReport=function(a){let h=_progRepS(a);c
     const F=stFlags(r).filter(x=>x.r!=='L');if(F.length)h+=`<ul>${F.map(x=>`<li><b>${esc(x.t)}.</b> ${esc(x.c.slice(0,400))}</li>`).join('')}</ul>`}
   return h};
 
+/* a client whose Day Book was imported only here: the debtors and creditors come from it (the parties of the matching, with every
+   entry in their ledger), so the Debtors and Creditors procedures are never empty while the file has them */
+var _ledMemo={};
+function stLed(d){const S0=d.settle;if(!S0?.P?.length)return null;const k=S0.at+(S0.opt?.asOn||'');if(_ledMemo.k===k)return _ledMemo.v;
+  const out={fromSettle:1,file:S0.file,at:S0.at,banks:{},dr:{},cr:{},from:S0.from,to:stAsOf(d)};
+  for(const [side,s] of [['S','dr'],['P','cr']]){const r=settleCalc(d,side);if(!r)continue;const names=new Set((r.tie||[]).map(x=>x.party));
+    for(const p of S0.P){if(!names.has(p[4]))continue;(out[s][p[4]]=out[s][p[4]]||[]).push({d:p[0],vt:p[2],vno:p[3],ref:(p[7]&&p[7][0]&&p[7][0][0])||p[9]||'',nar:String(p[11]||p[8]||'').slice(0,80),dr:p[5]?p[6]:0,cr:p[5]?0:p[6]})}}
+  _ledMemo={k,v:out};return out}
 /* the debtors and creditors ageing (Debtors / Creditors procedures) uses the same matching when the bill-wise file covers the date */
 const _partyCalcS=partyCalc;partyCalc=function(d,s,name){const x=_partyCalcS(d,s,name);
   if(!d.settle?.P?.length)return x;const r=settleCalc(d,s==='dr'?'S':'P',x.asOf&&x.asOf<stToday()?x.asOf:stToday());if(!r)return x;const p=stAgeing(r,x.asOf)[name];if(!p)return x;
-  return{...x,age:p.age.map(v=>R2(Math.max(0,v))),adv:R2(p.adv+p.acc),billwise:p,over45:R2(r.bills.filter(b=>b.party===name&&b.rem>1&&dayDiff(x.asOf,b.d)>45).reduce((t,b)=>t+b.rem,0))}};
+  /* the balance from the bills (open bills less advances), unless an opening or book balance was entered by hand: the Day Book
+     of the year alone has no opening balance, so its running total would leave out last year's bills still unpaid */
+  const own=d.party[s].P[name]||{},byBills=!(+own.open)&&!(own.bookBal!=null&&own.bookBal!=='')&&!own.book?.rows;
+  return{...x,...(byBills?{bal:R2(p.net),book:R2(p.net),fromBills:1}:{}),age:p.age.map(v=>R2(Math.max(0,v))),adv:R2(p.adv+p.acc),billwise:p,over45:R2(r.bills.filter(b=>b.party===name&&b.rem>1&&dayDiff(x.asOf,b.d)>45).reduce((t,b)=>t+b.rem,0))}};
 const _partyTabS=partyTab;partyTab=function(c,d,s){const h=_partyTabS(c,d,s);if(!d.settle?.P?.length)return h;
   return h.replace(/Ageing is worked out first-in, first-out from the [^<]*in the books\./,'Ageing is from the bill-wise matching of the Tally file: against the bill first, then by party and amount, then on account. Advances and on-account amounts not adjusted are shown under the party name.')};

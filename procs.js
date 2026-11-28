@@ -60,8 +60,10 @@ function planFor(c){const R=(c.risks&&c.risks.length?c.risks:suggestedRisks(c)),
 /* ---------- one record per client and financial year ---------- */
 const pdocId=(c,fy)=>c.id+'-'+String(fy).replace(/[^0-9]/g,'');
 const pdoc=c=>S.procs.find(r=>r.id===pdocId(c,fyNow()));
-const pOpen=c=>{const d=pdoc(c)||{};return{id:pdocId(c,fyNow()),clientId:c.id,fy:fyNow(),led:null,brs:{accts:[]},party:{dr:{P:{}},cr:{P:{}}},cash:{counts:[]},stock:null,fav:null,comp:{set:{},done:{}},ar:{notes:{}},conc:{},...d}};
-const savep=d=>put('procs',d.id,d);
+const pOpen=c=>{const d=pdoc(c)||{};const x={id:pdocId(c,fyNow()),clientId:c.id,fy:fyNow(),led:null,brs:{accts:[]},party:{dr:{P:{}},cr:{P:{}}},cash:{counts:[]},stock:null,fav:null,comp:{set:{},done:{}},ar:{notes:{}},conc:{},...d};
+  /* no books imported on the Programme tab, but a Day Book in Sales vs receipts: debtors and creditors from it (settle.js) */
+  if((!x.led||x.led.fromSettle)&&x.settle?.P?.length&&typeof stLed==='function'){try{x.led=stLed(x)}catch(e){}}return x};
+const savep=d=>put('procs',d.id,d.led?.fromSettle?{...d,led:null}:d);   // creditors read from the Day Book are worked out again each time, not stored twice
 const dayDiff=(a,b)=>Math.round((new Date(a+'T00:00:00')-new Date(b+'T00:00:00'))/864e5);
 const addDays=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
 const fyEnd=fy=>(+String(fy).slice(0,4)+1)+'-03-31',fyStart=fy=>String(fy).slice(0,4)+'-04-01';
@@ -171,9 +173,12 @@ function brsTab(c,d){
 
 /* ---------- debtors / creditors ---------- */
 const SIDE={dr:{n:'Debtors',one:'customer',k:'drs'},cr:{n:'Creditors',one:'supplier',k:'crs'}};
+/* the date the debtors / creditors are taken on: the date set here, else the settlement ageing date (today or the month chosen),
+   else the last date of the books, never after today */
+function partyAsOf(d,s){if(d.party[s].asOf)return d.party[s].asOf;if(d.settle?.P?.length&&typeof stAsOf==='function')return stAsOf(d);const t=today();return d.led?.to&&d.led.to<t?d.led.to:t}
 function partyRows(d,s,name){const p=d.party[s].P[name]||{};return(p.book?.rows||d.led?.[s]?.[name]||[]).slice().sort((a,b)=>a.d.localeCompare(b.d))}
 function partyCalc(d,s,name){
-  const p=d.party[s].P[name]||{},R=partyRows(d,s,name),asOf=d.party[s].asOf||d.led?.to||today(),open=+p.open||0;
+  const p=d.party[s].P[name]||{},R=partyRows(d,s,name),asOf=partyAsOf(d,s),open=+p.open||0;
   const inc=x=>s==='dr'?x.dr:x.cr,dec=x=>s==='dr'?x.cr:x.dr;
   const bal=R2(open+R.filter(x=>x.d<=asOf).reduce((t,x)=>t+inc(x)-dec(x),0)),book=p.bookBal!=null&&p.bookBal!==''?+p.bookBal:bal;
   /* FIFO ageing: bills are settled oldest first */
@@ -215,7 +220,7 @@ function partyTab(c,d,s){
   const ageT=[0,1,2,3,4].map(i=>R2(rows.reduce((t,r)=>t+r.age[i],0))),selN=rows.filter(sel),done=selN.filter(r=>r.p.conf?.recv||(r.rec&&Math.abs(R2(r.book-r.rec.calc))<=1));
   const msme=s==='cr'?rows.filter(r=>r.p.msme&&r.over45>0):[];
   let h=`<div class="kpis"><div class="kpi"><b>${rows.length}</b><span>${S_.n}</span></div><div class="kpi"><b>${inrc(tot)}</b><span>Total balance</span></div><div class="kpi"><b>${done.length} / ${selN.length}</b><span>Selected parties confirmed or reconciled</span></div><div class="kpi ${ageT[4]?'alert':''}"><b>${inrc(ageT[4])}</b><span>Over 180 days</span></div>${s==='cr'?`<div class="kpi ${msme.length?'alert':''}"><b>${msme.length}</b><span>MSME dues over 45 days</span></div>`:''}</div>
-  <div class="row small" style="margin:4px 0 10px;gap:14px"><label class="f" style="flex:0 1 12em">As on<input type="date" data-pcfg="${s}" data-k="asOf" value="${esc(cfg.asOf||d.led?.to||'')}"></label><label class="f" style="flex:0 1 14em">Confirm balances above (₹)<input type="number" data-pcfg="${s}" data-k="mat" value="${cfg.mat||''}" placeholder="${Math.round(mat)}"></label>
+  <div class="row small" style="margin:4px 0 10px;gap:14px"><label class="f" style="flex:0 1 12em">As on<input type="date" data-pcfg="${s}" data-k="asOf" value="${esc(partyAsOf(d,s))}"></label><label class="f" style="flex:0 1 14em">Confirm balances above (₹)<input type="number" data-pcfg="${s}" data-k="mat" value="${cfg.mat||''}" placeholder="${Math.round(mat)}"></label>
    <span class="muted" style="align-self:end">Ageing is worked out first-in, first-out from the ${s==='dr'?'invoices and receipts':'bills and payments'} in the books.</span></div>`;
   if(cur){const r=rows.find(x=>x.n===cur);h+=partyDetail(c,d,s,cur,r);return h+concBox(d,S_.k)}
   h+=`<div class="panel"><div class="row" style="margin-bottom:8px"><h3 class="sp" style="margin:0">${S_.n}: balances, ageing and confirmations</h3><button class="btn ghost sm" data-act="pCsv" data-v="${s}">${ic('down')}CSV</button><button class="btn ghost sm" data-act="pLetters" data-v="${s}">${ic('down')}Confirmation letters</button></div><div class="scroll"><table class="stack"><thead><tr><th>${S_.one[0].toUpperCase()+S_.one.slice(1)}</th><th class="num">Balance</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">91–180</th><th class="num">180+</th>${s==='cr'?'<th>MSME</th>':''}<th>Confirm</th><th>Status</th></tr></thead><tbody>
@@ -244,7 +249,7 @@ function partyDetail(c,d,s,name,r){
      <tr style="font-weight:600"><td>Balance as per books (reconciled)</td><td class="num">${inr(rc.calc)}</td></tr><tr><td>Balance as per books</td><td class="num">${inr(r.book)}</td></tr><tr style="font-weight:600"><td>Unexplained difference</td><td class="num">${sgn(R2(r.book-rc.calc))}</td></tr></tbody></table><p class="small muted">${rc.pairs} entries matched by amount, reference and date.</p></div>
      <div class="panel"><h3>Items to clear</h3>${['a','b','c','e'].filter(k=>rc.g[k][1].length).map(k=>`<p class="small" style="margin:6px 0 2px"><b>${esc(rc.g[k][0])}</b></p><table><tbody>${rc.g[k][1].slice(0,60).map(x=>`<tr><td>${fmtD(x.d)}</td><td>${esc(x.vno||x.ref||'')} ${esc(x.nar||'')}${x.tds?' <span class="tag y">TDS: party to adjust</span>':''}</td><td class="num">${inr(x.dr||x.cr)}</td></tr>`).join('')}</tbody></table>`).join('')||'<p class="small">Everything matched.</p>'}</div></div>`}
   return h}
-function confLetter(c,d,s,name,bal){const asOf=d.party[s].asOf||d.led?.to||today();
+function confLetter(c,d,s,name,bal){const asOf=partyAsOf(d,s);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Balance confirmation - ${esc(name)}</title><style>body{font:12pt/1.55 Georgia,serif;max-width:640px;margin:40px auto}td{padding:4px 8px;border:1px solid #999}</style></head><body>
   <p><b>${esc(c.name)}</b></p><p>Date: ${fmtD(today())}</p><p>To<br><b>${esc(name)}</b></p><p><b>Subject: Confirmation of balance as on ${fmtD(asOf)}</b></p>
   <p>Dear Sir / Madam,</p><p>As per our books of account, the balance in your account as on ${fmtD(asOf)} is <b>${inr(Math.abs(bal))}</b> ${s==='dr'?'receivable from you':'payable to you'}. Our internal auditors are verifying this balance.</p>
