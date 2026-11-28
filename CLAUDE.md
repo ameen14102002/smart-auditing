@@ -30,3 +30,7 @@ Client logos (28 Nov 2026): `clogo.js`. Paste/drop an image on a client's page o
 crops, drops stray bits, sizes it and puts it on a white (or, for a light logo, dark) tile, and saves one finished version on the
 client record (`c.logo`: `img` transparent PNG for re-editing, `xl` the finished tile shown everywhere). `clogo(c,h)` draws it in the
 app; `buildReport` puts the same tile on the Excel cover and every sheet's title bar (xlsxsa.js `sh.images`).
+Look (28 Nov 2026, owner approved): "Navy" skin in `navy.css` / `navy.js`, with 1Go 1.68/1.69 as the reference but Smart Auditing's own
+scene: a live canvas (ledger rows stream into a magnifier lens and leave as ticks) on sign-in, a still of it at the menu foot and the
+dashboard band; glass sign-in card that remembers the last person; gold open-page bar, a colour per area, working-paper background.
+The logo and the book-and-magnifier intro keep their sequence (navy only adds light). `?skin=classic` switches it off.
