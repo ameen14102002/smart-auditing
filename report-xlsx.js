@@ -108,7 +108,9 @@ RS.prototype={
   col(i){return colLetter(i)},
   push(cells,h){this.rows.push(cells);if(h)this.heights[this.rows.length]=h;return this.rows.length},
   gap(h){this.push([],h||10)},
-  fill(v,s,h,from=1){const c=[];c[from]={v,s};for(let j=from+1;j<this.n;j++)c[j]={v:'',s};return this.push(c,h)},
+  fill(v,s,h,from=1){const c=[];c[from]={v,s};for(let j=from+1;j<this.n;j++)c[j]={v:'',s};const r=this.push(c,h);
+    if((s==='title'||s==='sect')&&this.n-1>from)this.merges.push(this.col(from)+r+':'+this.col(this.n-1)+r);   /* the heading reads whole in any viewer */
+    return r},
   title(t,sub,back){this.gap(8);this.fill(t,'title',32);const r=this.fill(sub||'','sub',20),endC=back?this.n-2:this.n-1;
     if(endC>1){this.merges.push('B'+r+':'+this.col(endC)+r);const wd=this.w.slice(1,endC+1).reduce((a,b)=>a+b,0);this.heights[r]=Math.max(20,xLines(sub||'',wd,false)*14+6);this.rows[r-1][1].s='subW'}
     if(back)this.rows[r-1][this.n-1]={v:'‹ Summary',s:'linkR',f:`HYPERLINK("#'${back}'!A1","‹ Summary")`};this.gap(6)},
