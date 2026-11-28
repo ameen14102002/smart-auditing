@@ -29,3 +29,14 @@ test('expense ledgers kept bill-wise are not suppliers', () => {
   assert.deepEqual(r.nonTrade.map(x => x.party).sort(), ['General Expenses', 'Telephone Expenses']);
   assert.ok(!r.bills.some(b => /Expenses/.test(b.party)) && !r.pool.some(u => /Expenses/.test(u.party)));
 });
+test('payments made before the bill under its reference settle it when it comes (Blossom: Icube SO0052)', () => {
+  const P2 = [
+    ['2026-04-24', 'y', 'ITC Payment', '', 'Icube', 1, 25000, [['SO0052', 'A', 25000, 1, 0]], '', '', 1, 'HDFC Bank'],
+    ['2026-06-05', 'p', 'GST ITC', 'ITC/55', 'Icube', 0, 224672, [['SO0052', 'A', 224672, 0, 0]], '', '', 2, 'Software'],
+    ['2026-06-21', 'y', 'ITC Payment', '', 'Icube', 1, 25000, [['SO0052', 'A', 25000, 1, 0]], '', '', 3, 'HDFC Bank']
+  ];
+  const r = S.calc({ P: P2, X: [], from: '2026-04-01', to: '2026-10-31' }, 'P', { asOf: '2026-10-31' });
+  assert.equal(r.bills[0].rem, 174672);
+  assert.equal(r.opening.length, 0);
+  assert.equal(r.tie[0].diff, 0);
+});

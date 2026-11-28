@@ -16,7 +16,8 @@
 (function(root){
 const R2=n=>Math.round((+n||0)*100)/100;
 const dec=s=>s.indexOf('&')<0?s.trim():s.replace(/&amp;/g,'&').replace(/&apos;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#13;/g,'').replace(/&#10;/g,' ').replace(/&#(\d+);/g,(_,c)=>String.fromCharCode(+c)).trim();
-const xtag=(b,n)=>{const i=b.indexOf('<'+n);if(i<0)return'';const j=b.indexOf('>',i);if(j<0||b[j-1]==='/')return'';const k=b.indexOf('</'+n+'>',j);return k<0?'':dec(b.slice(j+1,k))};
+/* the tag itself, not a longer one that starts the same (<REFERENCE> is not <REFERENCEDATE>) */
+const xtag=(b,n)=>{let i=b.indexOf('<'+n);while(i>=0&&!/[\s>\/]/.test(b[i+n.length+1]||''))i=b.indexOf('<'+n,i+1);if(i<0)return'';const j=b.indexOf('>',i);if(j<0||b[j-1]==='/')return'';const k=b.indexOf('</'+n+'>',j);return k<0?'':dec(b.slice(j+1,k))};
 const num=s=>{const n=parseFloat(String(s).replace(/,/g,''));return isFinite(n)?n:0};
 const NONACC=/order|delivery|quotation|\bmemo\b|receipt note|rejection|stock journal|physical stock|material (in|out)|job work/i;
 const dayOf=s=>{s=String(s||'');return s.length===8&&/^\d+$/.test(s)?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8):s.slice(0,10)};

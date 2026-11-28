@@ -11,7 +11,8 @@
    Every party ties back to the books: period movement = open bills − unmatched credits + settlement of earlier years' bills. */
 (function(root){
 const R2=n=>Math.round((+n||0)*100)/100;
-const xtag=(b,n)=>{const i=b.indexOf('<'+n);if(i<0)return'';const j=b.indexOf('>',i);if(j<0||b[j-1]==='/')return'';const k=b.indexOf('</'+n+'>',j);return k<0?'':dec(b.slice(j+1,k))};
+/* the tag itself, not a longer one that starts the same (<REFERENCE> is not <REFERENCEDATE>) */
+const xtag=(b,n)=>{let i=b.indexOf('<'+n);while(i>=0&&!/[\s>\/]/.test(b[i+n.length+1]||''))i=b.indexOf('<'+n,i+1);if(i<0)return'';const j=b.indexOf('>',i);if(j<0||b[j-1]==='/')return'';const k=b.indexOf('</'+n+'>',j);return k<0?'':dec(b.slice(j+1,k))};
 const dec=s=>s.indexOf('&')<0?s.trim():s.replace(/&amp;/g,'&').replace(/&apos;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#13;/g,'').replace(/&#10;/g,' ').replace(/&#(\d+);/g,(_,c)=>String.fromCharCode(+c)).trim();
 const num=s=>{const n=parseFloat(String(s).replace(/,/g,''));return isFinite(n)?n:0};
 const day=s=>{s=String(s||'');return s.length===8&&/^\d+$/.test(s)?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8):s.slice(0,10)};
@@ -91,7 +92,7 @@ function calc(D,side,opt={}){
   const bills=[],pool=[],opening=[],over=[],allU=[],tie=[];
   const KIND={s:'Sales',p:'Purchase',r:'Receipt',y:'Payment',cn:'Credit note',dn:'Debit note',j:'Journal'};
   for(const [name,L] of Object.entries(parties)){L.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
-    const B=[],U=[],byCore={},src={};let move=0;
+    const B=[],U=[],byCore={},src={},preA={};let move=0;
     for(const p of L){move+=(p[5]===billDr?1:-1)*p[6];const pieces=p[7].length?netAl(p[7]):[['','',p[6],p[5],0]];
       for(const [ref,ty,amt,dr0] of pieces){const dr=p[7].length?dr0:p[5],isBill=dr===billDr,cr=core(ref);
         const base={d:p[0],t:p[1],kind:KIND[p[1]]||p[1],vt:p[2],vno:p[3],party:name,ref,ty,amt,nar:p[8],vref:p[9],oth:p[11]||''};
@@ -102,13 +103,17 @@ function calc(D,side,opt={}){
           if(ty==='A'&&byCore[cr]?.length){/* a debit against an existing bill (a bounced cheque, an extra charge): the bill is re-opened, as in Tally */
             const ob=byCore[cr][byCore[cr].length-1];ob.amt=R2(ob.amt+amt);ob.rem=R2(ob.rem+amt);(ob.adds=ob.adds||[]).push({d:p[0],kind:base.kind,vt:p[2],vno:p[3],amt,nar:p[8]});continue}
           const bl={...base,rem:amt,by:[],how:null,refd:0,cores:[...new Set([cr,core(p[3]),core(p[9])])].filter((x,i)=>x&&(i===0||x.length>=3))};B.push(bl);
-          if(ty==='N'||ty==='O'||ty===''){bl.cores.forEach((c,i)=>{if(!i||!byCore[c])(byCore[c]=byCore[c]||[]).push(bl)});if(ty==='N'&&cr&&byCore[cr]?.length>1)bl.dupName=1}else if(ty==='A')bl.orphan=1}
+          if(ty==='N'||ty==='O'||ty===''){bl.cores.forEach((c,i)=>{if(!i||!byCore[c])(byCore[c]=byCore[c]||[]).push(bl)});if(ty==='N'&&cr&&byCore[cr]?.length>1)bl.dupName=1}
+          else if(ty==='A'){if(cr&&!byCore[cr])byCore[cr]=[bl];if(!preA[cr]?.some(o=>o.amt>tol))bl.orphan=1}
+          /* payments made before the bill, under the bill's own reference (an advance booked as Agst Ref to the order or bill number):
+             they settle it when it comes, and are no longer payments of an earlier year's bill */
+          if(cr&&preA[cr])for(const o of preA[cr]){if(bl.rem<=tol)break;if(o.amt<=tol)continue;const take=R2(Math.min(o.amt,bl.rem));bl.rem=R2(bl.rem-take);bl.refd=R2(bl.refd+take);bl.by.push({d:o.d,kind:o.kind,vt:o.vt,vno:o.vno,amt:take,how:'adv',ty:'A'});o.amt=R2(o.amt-take);if(o.amt<=tol){const i=opening.indexOf(o);if(i>=0)opening.splice(i,1)}}}
         else{
           if(ty==='A'){const LB=byCore[cr];
             if(LB&&LB.length){let left=amt;for(const bl of LB){if(left<=0)break;const take=Math.min(left,bl.rem);if(take<=0)continue;bl.rem=R2(bl.rem-take);bl.refd=R2(bl.refd+take);bl.by.push({d:p[0],kind:base.kind,vt:p[2],vno:p[3],amt:R2(take),how:'ref',ty:'A'});left=R2(left-take)}
               if(left>tol){const bl=LB[LB.length-1];over.push({...base,bill:bl,excess:R2(left)});U.push({...base,amt:R2(left),rem:R2(left),x:'over'})}}
             else if(src[cr])src[cr].rem=R2(src[cr].rem+amt);
-            else opening.push(base)}
+            else{opening.push(base);(preA[cr]=preA[cr]||[]).push(base)}}
           else{const u={...base,rem:amt};U.push(u);if(ty==='V'||ty==='N')src[cr]=u}}}}
     for(const b of B)if(b.how===null&&b.rem<=tol){b.how=b.refd?'ref':'round';b.rem=0}
     for(const b of B)b.t0=b.rem;for(const u of U){u.t0=u.rem;allU.push(u)}

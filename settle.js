@@ -26,7 +26,9 @@ const stToday=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMon
 const stMonthEnd=ym=>{const [y,m]=ym.split('-').map(Number);return ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0')};
 const ST_MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 /* the month of the audit, from its period ("october", "Oct 2026", "Apr–Sep 2026"): the last month named; the year named, else the latest such month up to now (this month: to date) */
-function stAuditMonth(){const a=typeof A==='function'?A():null,t=String(a?.period||'').toLowerCase();if(!t)return'';
+/* the audit in hand: the one open on screen, or the one a report is being built for (ST_AUDIT) */
+var ST_AUDIT=null;
+function stAuditMonth(){const a=ST_AUDIT||(typeof A==='function'?A():null),t=String(a?.period||'').toLowerCase();if(!t)return'';
   let mi=-1,at=-1;ST_MON.forEach((m,i)=>{const re=new RegExp('\\b'+m,'g');let x;while((x=re.exec(t)))if(x.index>at){at=x.index;mi=i}});if(mi<0)return'';
   const ys=t.match(/20\d\d/g),today=stToday();let y=ys?+ys[ys.length-1]:+today.slice(0,4);
   if(ys&&/20\d\d\s*[-–\/]\s*\d{2}\b/.test(t)&&!/20\d\d\s*$/.test(t.trim())){const fy=+t.match(/(20\d\d)\s*[-–\/]\s*\d{2}\b/)[1];y=mi>=3?fy:fy+1}

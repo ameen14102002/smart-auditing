@@ -128,13 +128,15 @@ const linkTo=(sheet,text)=>({v:text,s:'link',f:`HYPERLINK("#'${sheet}'!A1","${St
 const opinionAll=(O,procs)=>['Satisfactory','Needs improvement','Unsatisfactory'][Math.max(['Satisfactory','Needs improvement','Unsatisfactory'].indexOf(opinionOf(O)),procs.some(p=>p.tone==='bad')?2:procs.some(p=>p.tone==='warn')?1:0)];
 const opStyle=op=>op==='Satisfactory'?'okC':op==='Needs improvement'?'warnC':'badC';
 
+/* every figure of an audit is taken on that audit's own date (its month, or today): the audit is set while its parts are built */
+const _withAudit=(a,f)=>{const k=typeof ST_AUDIT!=='undefined'?ST_AUDIT:null;try{ST_AUDIT=a;return f()}finally{ST_AUDIT=k}};
 function buildReport(audits,opt={}){
   audits=audits.filter(Boolean);const cl=[...new Set(audits.map(a=>a.clientId))].map(id=>S.clients.find(x=>x.id===id)).filter(Boolean);
   const O=obsOfReport(audits),per0=[...new Set(audits.map(a=>a.period).filter(Boolean))],sub=cl.map(c=>c.name).join(', ')+(per0.length?'  ·  '+per0.join(', '):'')+'  ·  '+fmtD(today());
   XS_FOOT=cl.map(c=>c.name).join(', ')+' · Internal audit report · '+fmtD(today());
   const SUM='1 Summary',sheets=[],procs=[];let no=3;
   const seen=new Set();for(const a of audits){const c=S.clients.find(x=>x.id===a.clientId);if(!c)continue;for(const k of (opt.only?[opt.only]:programmeOf(a))){const key=k==='chk'?a.id+k:c.id+k;if(seen.has(key))continue;seen.add(key);
-    const f=procFacts(a,c,k),obs=obsOfProc(a,k,O),ev=evOfProc(a,c,k);if(f.money==null)f.money=0;f.money+=obs.reduce((t,o)=>t+(+o.amount||0),0);procs.push({a,c,k,f,obs,ev,tone:toneFor(f,obs),sheet:(no++)+' '+shortName(k,a,audits.length>1)})}}
+    const f=_withAudit(a,()=>procFacts(a,c,k)),obs=obsOfProc(a,k,O),ev=evOfProc(a,c,k);if(f.money==null)f.money=0;f.money+=obs.reduce((t,o)=>t+(+o.amount||0),0);procs.push({a,c,k,f,obs,ev,tone:toneFor(f,obs),sheet:(no++)+' '+shortName(k,a,audits.length>1)})}}
   const op=opinionAll(O,procs);
   /* 1 Summary */
   const s=new RS(SUM);s.tab='FF17875A';s.title('Internal audit report: summary',sub);
@@ -163,7 +165,7 @@ function buildReport(audits,opt={}){
   h.section('Words used');h.table([{h:'Word',at:'C',k:'b'},{h:'Meaning',at:'D'}],GLOSS);h.rows.forEach(r=>{if(r[3]&&r[3].s&&/^td/.test(r[3].s))r[3]={...r[3]}});
   sheets.push(h.out());
   /* procedures */
-  for(const p of procs){sheets.push(procSheet(p,SUM));for(const dsh of detailSheets(p,SUM))sheets.push(dsh)}
+  for(const p of procs){_withAudit(p.a,()=>{sheets.push(procSheet(p,SUM));for(const dsh of detailSheets(p,SUM))sheets.push(dsh)})}
   const DOCS=docsUsed(audits,cl,procs);
   sheets.push(findingsSheet(procs,O,SUM,DOCS),obsSheetX(O,SUM,procs),discSheetX(O,audits,SUM,procs),docsSheet(DOCS,SUM),evSheetX(audits,cl,SUM));
   sheets.unshift(coverSheet(audits,cl,sheets,procs,op));
