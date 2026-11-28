@@ -1,16 +1,14 @@
 {
-  "name": "gst-fetch",
-  "version": "1.0.0",
+  "name": "smart-auditing-portal-helper",
+  "version": "2.0.0",
+  "private": true,
   "type": "module",
-  "description": "Smart Auditing — automated GST return downloads from the GST portal via Playwright (manifest-driven). No 1Go.",
+  "description": "Smart Auditing portal helper: takes GSTR-1, GSTR-2B, GSTR-3B and TDS challans from the GST portal, the Income Tax portal and TRACES on this computer, the way 1Go does, after the person signs in. No 1Go needed.",
   "scripts": {
     "start": "node server.js",
-    "fetch": "node fetch.js"
+    "page": "node tools/make-page.mjs ../../company-software-suite/src/portalpreload.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.4",
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
     "playwright": "^1.48.0"
   }
 }

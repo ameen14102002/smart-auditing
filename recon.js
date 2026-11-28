@@ -126,11 +126,17 @@ async function readPortalFile(name,buf,hint){
     if(/3\.1\(a\)/.test(flat))return parseG3Btable(rows);
     throw new Error(name+': not recognised. Expected the GSTR-2B Excel, a challan list (with BSR code) or the GSTR-3B summary template.')}
   throw new Error(name+': use JSON, ZIP, Excel or CSV.')}
-/* the GST portal splits a big GSTR-1 into several JSON files inside one ZIP */
-function mergeG1(L){const g=L.filter(r=>r.kind==='g1'),rest=L.filter(r=>r.kind!=='g1');if(g.length<2)return L;const by={};
-  for(const r of g){const k=r.period||'?';if(!by[k]){by[k]=r;continue}const a=by[k];addT(a.tot,r.tot);a.inv.push(...r.inv);a.skipped+=r.skipped;for(const [s,t] of Object.entries(r.split))a.split[s]=addT(a.split[s]||T0(),t)}
-  return[...Object.values(by),...rest]}
-
+/* the GST portal splits a big GSTR-1 into several JSON files inside one ZIP, and a big GSTR-2B into File 1, File 2 ...:
+   the parts of one month are added up into one set */
+function mergeParts(L){const out=[],by={};
+  for(const r of L){if((r.kind!=='g1'&&r.kind!=='g2b')||!r.period){out.push(r);continue}const k=r.kind+'|'+r.period;
+    if(!by[k]){by[k]={...r,inv:[...(r.inv||[])],tot:addT(T0(),r.tot||T0()),...(r.kind==='g1'?{split:{...r.split}}:{other:addT(T0(),r.other||T0())})};out.push(by[k]);continue}
+    const a=by[k];a.inv.push(...(r.inv||[]));
+    if(r.kind==='g1'){addT(a.tot,r.tot);a.skipped=(a.skipped||0)+(r.skipped||0);for(const [sp,t] of Object.entries(r.split||{}))a.split[sp]=addT(a.split[sp]||T0(),t)}
+    else{addT(a.other,r.other||T0());a.parts=(a.parts||1)+1}}
+  for(const a of Object.values(by))if(a.kind==='g2b'&&a.parts)finish2B(a);
+  return out}
+const mergeG1=mergeParts;
 /* ---------- storing ---------- */
 function rcOpen(c){return rdoc(c)||{id:rdocId(c,fyNow()),clientId:c.id,fy:fyNow(),bS:null,bP:null,tB:null,g1:{},g2b:{},g3b:{},chl:null,notes:{},handoffs:[],files:[]}}
 const compactBook=r=>({d:r.date,n:r.vno,f:String(r.ref||'').trim(),g:String(r.gstin||'').toUpperCase(),p:r.party,tx:R2(r.taxable),i:R2(r.igst),c:R2(r.cgst),s:R2(r.sgst),v:R2(r.amount),k:/Return/.test(r.type)?(r.type==='salesReturn'?'cn':'dn'):'inv'});
@@ -175,7 +181,7 @@ async function rcPortalFiles(c,files){
   /* all files first, so a GSTR-1 split over several files of one month adds up instead of the last one replacing the others */
   const res=[],errs=[];
   for(const f of files){try{toast('Reading '+f.name+'…');res.push(...(await readPortalFile(f.name,await f.arrayBuffer(),ui.rcHint)).map(r=>({...r,from:f.name})));await rcEvidence(c,f,'GST / TDS portal data')}catch(e){errs.push(e.message||String(e))}}
-  try{const said=res.length?await putPortal(c,mergeG1(res),files.length===1?files[0].name:files.length+' files'):[];toast((said.length?'Saved: '+said.join(', '):'Nothing saved')+(errs.length?'. '+errs.join(' '):''))}catch(e){toast(e.message||String(e))}}
+  try{const said=res.length?await putPortal(c,mergeParts(res),files.length===1?files[0].name:files.length+' files'):[];toast((said.length?'Saved: '+said.join(', '):'Nothing saved')+(errs.length?'. '+errs.join(' '):''))}catch(e){toast(e.message||String(e))}}
 
 /* ---------- the reconciliations ---------- */
 const tol=d=>+d?.tol||RTOL;
@@ -242,28 +248,35 @@ function rcCoverage(d){const fm=fyMonths(d.fy),has=(s,m)=>s==='bS'||s==='bP'?!!d
   return `<div class="scroll"><table class="cov"><thead><tr><th>Source</th>${fm.map(m=>`<th class="num">${mLabel(m)}</th>`).join('')}</tr></thead><tbody>${Object.entries(RSRC).map(([s,l])=>`<tr><td>${l}</td>${fm.map(m=>`<td class="num">${has(s,m)?'<span style="color:var(--ok)">●</span>':'<span class="muted">·</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
 function rcHave(d){const fm=fyMonths(d.fy),cnt=s=>{if(s==='g1'||s==='g2b'||s==='g3b')return Object.keys(d[s]||{}).filter(m=>fm.includes(m)).length;return 0};
   return {g1:cnt('g1'),g2b:cnt('g2b'),g3b:cnt('g3b'),hasAny:cnt('g1')+cnt('g2b')+cnt('g3b')>0}}
-/* ---------- in-app GST automation (Playwright service) ---------- */
-const gstSanitize=s=>String(s||'').replace(/[^A-Za-z0-9._-]+/g,'_').slice(0,80);
-const gstManifest=()=>ui.gstManifest||{storage:{bucket:'gst-returns',pathTemplate:'{client}/{ret}_{month}.{ext}'}};
-const gstFmt=(t,v)=>t.replace(/\{(\w+)\}/g,(_,k)=>String(v[k]??''));
-const gstPath=(client,ret,month,ext)=>gstFmt(gstManifest().storage.pathTemplate,{client:gstSanitize(client),ret,month,ext});
-async function gstCheck(){const u=ui.gstFetchUrl;if(!u)return;try{const r=await fetch(u+'/health',{method:'GET'});if(r.ok){ui.gstOnline=true;if(!ui.gstManifest){try{ui.gstManifest=await(await fetch(u+'/manifest')).json()}catch(e){}}}else ui.gstOnline=false}catch(e){ui.gstOnline=false}schedule()}
-/* pull the files the automation downloaded to Supabase Storage and match them in-app */
-async function rcPullStorage(c){try{const M=gstManifest(),bucket=M.storage.bucket,root=gstSanitize(c.name);toast('Pulling downloaded returns from storage…');const {data,error}=await sb.storage.from(bucket).list(root,{limit:1000});if(error)throw new Error(error.message);const files=(data||[]).filter(f=>/\.(json|zip|xlsx|xls|csv)$/i.test(f.name));if(!files.length)return toast('Nothing downloaded for this client yet — run Fetch from the portals first.');let said=[];for(const f of files){const p=root+'/'+f.name;const {data:blob,error:de}=await sb.storage.from(bucket).download(p);if(de)throw new Error(de.message);const res=await readPortalFile(f.name,await blob.arrayBuffer(),'');said.push(...await putPortal(c,res,'portal-fetch'));}toast('Pulled '+said.length+' set'+(said.length===1?'':'s')+' from storage: '+said.join(', '))}catch(e){toast('Pull failed: '+(e.message||e))}}
+/* ---------- the portal helper: GST and TDS taken from the portals on this computer, the way 1Go does ----------
+   The helper (gst-fetch, "Start portal helper.cmd") opens the GST portal, the Income Tax portal or TRACES in a window on this
+   computer. The person signs in there (username, password, CAPTCHA, OTP: nothing is asked for or kept here); the helper then takes
+   each return and month: GSTR-1 as JSON, GSTR-2B as Excel (JSON, File 1, File 2 ..., when the portal says it is too big for
+   Excel), GSTR-3B figures, and the TDS challans from the challan list. Smart Auditing reads every file in, whatever its size. */
+const HELPER_ZIP='portal-helper.zip';
+const helperUrl=()=>ui.gstFetchUrl||'http://127.0.0.1:8790';
+async function helper(path,opt){const r=await fetch(helperUrl()+path,{cache:'no-store',...(opt||{})});if(!r.ok){let m='';try{m=(await r.json()).error}catch(e){}throw new Error(m||('The portal helper answered '+r.status))}return r}
+async function gstCheck(){try{const h=await(await helper('/health')).json();ui.gstOnline=!!h.ok;ui.helperInfo=h}catch(e){ui.gstOnline=false}schedule()}
+const runKey=c=>'sa-portal-run-'+c.id;
+const lastRun=c=>{try{return JSON.parse(localStorage.getItem(runKey(c))||'null')}catch(e){return null}};
+const OUTCOME={saved:['g','Saved'],notfiled:['y','Not filed'],noperiod:['y','Period not offered'],notfound:['y','Not on the portal'],pending:['y','Still being prepared'],failed:['r','Failed'],timeout:['r','No file in time'],notdone:['','Not done']};
 function fetchPanel(c,d){
   const fm=fyMonths(fyNow()),now=new Date().toISOString().slice(0,7),def=fm.filter(m=>m<now),sel=ui.fetchSel||{items:['GSTR1','GSTR2B','GSTR3B'],months:def.length?def:fm.slice(0,1)};
-  const got=rcHave(d),needGst=sel.items.some(i=>i!=='TDS');
+  const got=rcHave(d),needGst=sel.items.some(i=>i!=='TDS'),tdsFrom=ui.fetchTds||'traces';
   if(!('gstOnline' in ui)){ui.gstOnline=null;gstCheck()}
-  const auto=ui.gstOnline===true,job=ui.gstJob;
-  return `<div class="panel"><h3>${ic('down')}Fetch from the portals</h3><p class="small muted" style="margin:-4px 0 8px">${auto?'Playwright automation is on — the app downloads the GST returns from the portal itself and reads them in.':'Open the portal downloads, drop each file into the matching box on the left, and Smart Auditing reads and matches it here — for any volume, long or short.'} No 1Go, no handoff: the matching is done in this app.</p>
+  const on=ui.gstOnline===true,job=ui.gstJob&&ui.gstJob.clientId===c.id?ui.gstJob:null,last=lastRun(c);
+  const rs=job?.results||[];
+  return `<div class="panel"><h3>${ic('down')}Fetch from the portals</h3><p class="small muted" style="margin:-4px 0 8px">The portal helper on this computer opens the portal; you sign in there, and it takes every return and month for you. Small and medium returns come as the portal's Excel, big ones as JSON (in parts when the portal splits them). Smart Auditing reads them all. No 1Go.</p>
    <div class="chips" style="margin:0 0 6px">${[['GSTR1','GSTR-1'],['GSTR2B','GSTR-2B'],['GSTR3B','GSTR-3B'],['TDS','TDS challans']].map(([k,l])=>`<label class="chip" style="cursor:pointer"><input type="checkbox" data-fetchitem="${k}" ${sel.items.includes(k)?'checked':''} style="width:16px;min-height:16px">${l}</label>`).join('')}</div>
    <div class="chips" style="margin:0 0 8px">${fm.map(m=>`<label class="chip" style="cursor:pointer;${m>now?'opacity:.55':''}"><input type="checkbox" data-fetchmonth="${m}" ${sel.months.includes(m)?'checked':''} style="width:16px;min-height:16px">${mLabel(m)}</label>`).join('')}</div>
+   ${sel.items.includes('TDS')?`<div class="row small" style="margin:0 0 8px"><label class="f" style="flex:0 1 18em">TDS challans from<select data-fetchtds="1"><option value="traces" ${tdsFrom==='traces'?'selected':''}>TRACES (Challan Status)</option><option value="ittan" ${tdsFrom==='ittan'?'selected':''}>Income Tax portal, TAN login (Payment History)</option></select></label>${c.tan?`<span class="muted">TAN ${esc(c.tan)}</span>`:`<span class="tag y">No TAN in the client master</span>`}</div>`:''}
    ${needGst&&!c.gstin?`<p class="small"><span class="tag y">GSTIN needed</span> Add the client's GSTIN in the client master to fetch the GST returns.</p>`:''}
-   <div class="row"><button class="btn" data-act="fetchStart" ${needGst&&!c.gstin?'disabled':''}>${ic('down')}Fetch from the portals</button><button class="btn ghost" data-act="rcPull">${ic('up')}Pull downloaded files</button><span class="small">${sel.items.length} item${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
-   ${ui.gstOnline===true?`<p class="small" style="margin:6px 0 0"><span class="tag g">Automation on</span> ${esc(ui.gstFetchUrl)} — click Fetch to download automatically.</p>`:ui.gstOnline===false?`<p class="small" style="margin:6px 0 0"><span class="tag y">Automation off</span> ${esc(ui.gstFetchUrl)} not reachable. Run the gst-fetch service for full automation; otherwise the Fetch button opens the portal for a manual download.</p>`:''}
-   ${job?`<p class="small muted" style="margin:6px 0 0">Automation ${esc(job.status)}: downloaded ${job.downloaded||0}, uploaded ${job.uploaded||0}${job.errors&&job.errors.length?' · '+job.errors.length+' error'+(job.errors.length===1?'':'s'):''}.</p>`:''}
+   <div class="row"><button class="btn" data-act="fetchStart" ${(needGst&&!c.gstin)||job?.status==='running'?'disabled':''}>${ic('down')}Fetch from the portals</button>${job?.status==='running'?`<button class="btn ghost" data-act="fetchStop">Stop</button>`:''}${!job&&last?`<button class="btn ghost" data-act="rcPull" title="Read the files of the last run again">${ic('up')}Read the last run's files</button>`:''}<span class="small">${sel.items.length} item${sel.items.length===1?'':'s'} · ${sel.months.length} month${sel.months.length===1?'':'s'}</span></div>
+   ${on?`<p class="small" style="margin:6px 0 0"><span class="tag g">Portal helper on</span> Click Fetch: a portal window opens on this computer for you to sign in.</p>`:ui.gstOnline===false?`<div class="small" style="margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px"><span class="tag y">Portal helper not running</span> Set it up once on this computer: <a href="${HELPER_ZIP}" download>download the portal helper</a>, unzip it, and double-click <b>Start portal helper.cmd</b> (it needs <a href="https://nodejs.org" target="_blank" rel="noopener">Node.js</a>). Keep its window open, then <a href="#" data-act="helperCheck">check again</a> (if the browser asks to let this site reach apps on this computer, choose Allow). Until then you can download the files from the portal yourself and drop them in the boxes on the left.</div>`:''}
+   ${job?`<div class="small" style="margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--soft,rgba(40,90,160,.06))"><b>${job.status==='running'?(job.signedIn?'Working':'Waiting for your sign-in'):job.status==='reading'?'Reading the files':job.status==='error'?'Stopped':'Done'}</b>${job.qn?` · ${Math.min(job.qi,job.qn)} of ${job.qn} returns`:''}<div style="margin-top:4px">${esc(job.text||'')}</div>
+     ${rs.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${rs.map(r=>{const o=OUTCOME[r.outcome]||['',r.outcome];return`<span class="tag ${o[0]}" title="${esc(r.text||'')}">${esc(r.label)}${r.fmt==='JSON'&&r.ret==='GSTR2B'?' (JSON)':''}: ${o[1]}</span>`}).join('')}</div>`:''}</div>`:''}
    ${got.hasAny?`<p class="small muted" style="margin:6px 0 0">Already in the app: ${got.g1} GSTR-1, ${got.g2b} GSTR-2B, ${got.g3b} GSTR-3B month-sets.</p>`:''}
-   <p class="small muted" style="margin:6px 0 0"><b>What it fetches:</b> GSTR-1 as JSON (or ZIP of JSON) · GSTR-2B as Excel or JSON · GSTR-3B as JSON, or the 3B summary template CSV · TDS challans from TRACES (CSV/Excel). For 1,000+ invoices the app reads every invoice.</p></div>`}
+   <p class="small muted" style="margin:6px 0 0"><b>Taken:</b> GSTR-1 JSON · GSTR-2B Excel, or JSON for 1,000+ documents · GSTR-3B filed figures · TDS challans. Nothing is filed, paid or changed on any portal, and no password is asked for or kept.</p></div>`}
 
 function reconTab(c){
   const d=rcOpen(c),cur=Object.keys(RC).includes(ui.rtab)?ui.rtab:'data';
@@ -353,43 +366,41 @@ function mandCard(c){
    the browser. The user signs in to the portal (once, in their own browser),
    downloads each file, and drops it into the portal-files box — the app then
    reads and matches it in-app, for any invoice volume (long or short). */
-function portalDownloadUrls(c,items,months){
-  const gstin=(c.gstin||'').replace(/\s/g,'').toUpperCase();
-  const base='https://gst.gov.in';
-  const urls=[];
-  for(const it of items){
-    if(it==='TDS'){urls.push({it,m:'',url:'https://traces.incometax.gov.in'});continue}
-    for(const m of months){
-      const [fy,mm]=m.split('-');
-      if(it==='GSTR1')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-1&action=download`});
-      else if(it==='GSTR2B')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-2B&action=download`});
-      else if(it==='GSTR3B')urls.push({it,m,url:`${base}/services/taxpayer/returns/download-return?gstin=${gstin}&ret_period=${fy}-${mm}&ret_type=GSTR-3B&action=download`});
-    }
-  }
-  return urls;
-}
 async function fetchStart(){
   const c=C();if(!c)return;
   const items=[...document.querySelectorAll('[data-fetchitem]:checked')].map(x=>x.dataset.fetchitem);
   const months=[...document.querySelectorAll('[data-fetchmonth]:checked')].map(x=>x.dataset.fetchmonth).sort();
   ui.fetchSel={items,months};
-  if(!items.length||!months.length)return toast('Choose what to fetch and at least one month.');
+  if(!items.length||(!months.length&&items.some(i=>i!=='TDS')))return toast('Choose what to fetch and at least one month.');
   if(items.some(i=>i!=='TDS')&&!isGstin(c.gstin))return toast("Add the client's GSTIN in the client master to fetch the GST returns.");
-  /* prefer the Playwright automation service when it is reachable */
-  if(ui.gstFetchUrl){try{const r=await fetch(ui.gstFetchUrl+'/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client:c.name,gstin:c.gstin,items,months})});if(r.ok){const {id}=await r.json();if(id){ui.gstJob={id,status:'running',downloaded:0,uploaded:0,errors:[]};toast('Automation started — downloading in the background');render();gstWatch();return}}}catch(e){/* not reachable: fall through to manual */}}
-  /* fallback: open the portal download URLs in the browser */
-  const urls=portalDownloadUrls(c,items,months);
-  toast(`Opening ${urls.length} ${urls.length===1?'download':'downloads'} from the portals`);
-  for(let i=0;i<urls.length;i++){setTimeout(()=>{const w=window.open(urls[i].url,'_blank','noopener');if(!w)toast('Pop-up blocked for one download — allow pop-ups for this site and try again.')},i*600)}
-  render();
-}
+  try{const r=await helper('/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client:c.name,gstin:(c.gstin||'').toUpperCase(),tan:c.tan||'',items,months,tdsFrom:ui.fetchTds||'traces'})});
+    const {id}=await r.json();ui.gstOnline=true;
+    ui.gstJob={id,clientId:c.id,status:'running',text:'Opening the portal window on this computer…',results:[]};
+    try{localStorage.setItem(runKey(c),JSON.stringify({id,at:Date.now()}))}catch(e){}
+    toast('A portal window is opening on this computer: sign in there.');render();gstWatch()}
+  catch(e){ui.gstOnline=false;render();toast(/fetch/i.test(e.message)?'The portal helper is not running on this computer. Start it (see the box below) and try again.':e.message)}}
 async function gstWatch(){
-  const id=ui.gstJob?.id;if(!id||!ui.gstFetchUrl)return;
-  try{const s=await(await fetch(ui.gstFetchUrl+'/status/'+id)).json();Object.assign(ui.gstJob,s);
-    if(s.status==='running'){schedule();setTimeout(gstWatch,2500)}
-    else{const c=C();if(s.status==='done'&&(s.uploaded||0)>0)await rcPullStorage(c).catch(()=>{});if(s.status==='done')toast(`Automation done: ${s.uploaded||0} file${(s.uploaded||0)===1?'':'s'} downloaded`);else if(s.status==='error')toast('Automation failed: '+(s.errors[0]||'unknown'));ui.gstJob=null;schedule()}}
-  catch(e){ui.gstJob=null;schedule()}
-}
+  const J=ui.gstJob;if(!J||J.status!=='running')return;
+  try{const s=await(await helper('/status/'+J.id)).json();Object.assign(J,s);
+    if(s.status==='running'){schedule();clearTimeout(gstWatch.t);gstWatch.t=setTimeout(gstWatch,2000);return}
+    const c=S.clients.find(x=>x.id===J.clientId);if(c)await helperPull(c,J.id);else{J.status='done';schedule()}}
+  catch(e){J.status='error';J.text='Lost touch with the portal helper ('+(e.message||e)+'). Start it again and use “Read the last run’s files”.';schedule()}}
+/* the files of a run, read into Smart Auditing: all of a month's parts together (a GSTR-1 or GSTR-2B split by the portal adds up) */
+async function helperPull(c,id){
+  id=id||lastRun(c)?.id;if(!id)return toast('No portal run for this client yet.');
+  const J=ui.gstJob&&ui.gstJob.id===id?ui.gstJob:(ui.gstJob={id,clientId:c.id,status:'reading',text:'',results:[]});
+  try{const s=await(await helper('/status/'+id)).json();Object.assign(J,s,{status:'reading',text:'Reading '+s.files.length+' file'+(s.files.length===1?'':'s')+' into Smart Auditing…'});schedule();
+    const res=[],errs=[],keep=ui.rcMonth;
+    for(const f of s.files){try{const buf=await(await helper('/file/'+id+'/'+f.n)).arrayBuffer();ui.rcMonth=f.month||keep;
+        res.push(...(await readPortalFile(f.name,buf,f.ret==='GSTR2B'?'g2b':'')).map(r=>({...r,from:f.name})));
+        rcEvidence(c,new File([buf],f.name),'GST portal data ('+(f.ret||'file')+' '+(f.month?mLabel(f.month):'')+')').catch(()=>{})}
+      catch(e){errs.push(f.name+': '+(e.message||e))}finally{ui.rcMonth=keep}}
+    let said=res.length?await putPortal(c,mergeParts(res),'Portal helper'):[];
+    if(s.challans){const ch=await(await helper('/challans/'+id)).json();if(ch.rows?.length)said=said.concat(await putPortal(c,[{kind:'chl',rows:ch.rows}],'Portal helper'))}
+    J.status='done';J.text=(said.length?'Read into Smart Auditing: '+said.join(', ')+'.':'Nothing new to read in.')+(errs.length?' Not read: '+errs.join('; '):'');
+    toast(J.text.slice(0,240))}
+  catch(e){J.status='error';J.text=/fetch/i.test(e.message)?'The portal helper is not running. Start it, then use “Read the last run’s files”.':(e.message||String(e));toast(J.text)}
+  schedule()}
 
 /* ---------- actions ---------- */
 const rcCsvRows={
@@ -401,7 +412,9 @@ Object.assign(ACT,{
   rcf:t=>{ui.rcf=t.dataset.v;render()},
   g3bTpl:()=>dlFile('GSTR-3B summary template.csv',G3B_TEMPLATE),
   fetchStart:()=>fetchStart(),
-  rcPull:()=>rcPullStorage(C()),
+  rcPull:()=>helperPull(C()),
+  fetchStop:async()=>{const J=ui.gstJob;if(!J)return;try{await helper('/stop/'+J.id,{method:'POST'});toast('Stopping: the helper logs out of the portal first.')}catch(e){toast(e.message)}},
+  helperCheck:()=>{ui.gstOnline=null;gstCheck();render()},
   rcCsv:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=k==='r5'?rcCsvRows.tds(r):[...rcCsvRows.mon(r,k),...(r.inv.length?[[],...rcCsvRows.inv(r)]:[])];dlFile(fileSafe(c.name)+' '+RCSHORT[k]+' FY '+d.fy+'.csv',rows.map(x=>x.map(q).join(',')).join('\n'))},
   rcObs:t=>{const c=C(),d=rcOpen(c),k=t.dataset.v,r=recon(d,k);
     const cond=k==='r5'?`TDS deducted in the books of ${inr(R2((d.tB?.rows||[]).filter(x=>x.kind==='ded').reduce((s,x)=>s+x.amount,0)))} was not fully deposited by the due dates: ${inr(r.short)} remains unpaid; estimated interest ${inr(r.interest)}. ${r.unbooked.length} challans are not found in the books.`:
@@ -410,7 +423,8 @@ Object.assign(ACT,{
     newObs({clientId:c.id,auditId:A()?.id||'',title:'Differences in '+RC[k],rating:Math.abs(k==='r5'?r.short:r.diffTax)>100000?'H':'M',condition:cond,criteria:crit,effect:k==='r5'?'Interest and possible disallowance of the expense.':'Possible tax demand, interest and penalty; ITC at risk.',rec:'Reconcile the differences with the client, correct them in the next return or by payment / reversal through DRC-03, and keep the reconciliation on file every month.'})}
 });
 document.addEventListener('change',e=>{
-  const t=e.target;if(!(t.dataset.rctol||t.dataset.rcconc!=null||t.dataset.rcnote!=null||t.dataset.rcmonth||t.dataset.fetchitem||t.dataset.fetchmonth))return;
+  const t=e.target;if(!(t.dataset.rctol||t.dataset.rcconc!=null||t.dataset.rcnote!=null||t.dataset.rcmonth||t.dataset.fetchitem||t.dataset.fetchmonth||t.dataset.fetchtds))return;
+  if(t.dataset.fetchtds){ui.fetchTds=t.value;return}
   if(t.dataset.rcmonth){ui.rcMonth=t.value;return}
   if(t.dataset.fetchitem||t.dataset.fetchmonth){ui.fetchSel={items:[...document.querySelectorAll('[data-fetchitem]:checked')].map(x=>x.dataset.fetchitem),months:[...document.querySelectorAll('[data-fetchmonth]:checked')].map(x=>x.dataset.fetchmonth)};return}
   const c=C(),d=rcOpen(c);

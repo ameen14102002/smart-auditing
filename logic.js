@@ -21,7 +21,7 @@ const STAGES=['Planned','Fieldwork','Review','Reported','Closed'];
 const OSTAT=['Open','In progress','Closed'];
 const RLABEL={H:'High',M:'Medium',L:'Low'};
 const S={clients:[],audits:[],observations:[],evidence:[],vouching:[]};
-const ui={view:'home',id:null,ctab:'overview',atab:'checklist',f:{client:'',rating:'',status:'open',stage:''},armed:null,draft:null,lastId:null,gstFetchUrl:'http://localhost:8790',gstManifest:null,gstJob:null};
+const ui={view:'home',id:null,ctab:'overview',atab:'checklist',f:{client:'',rating:'',status:'open',stage:''},armed:null,draft:null,lastId:null,gstFetchUrl:'http://127.0.0.1:8790',gstJob:null};
 let db=null,users=null,dl=null,me=null,live=false,names={},pending=false;
 /* Hosted mode: Supabase (public URL + publishable key; data is protected by row-level security). */
 const SB={url:'https://mkwwrkvsjafzxvlbfwla.supabase.co',key:'sb_publishable_VLkwQvLmUKFenUfC56VDxw_tmr49Adq'};

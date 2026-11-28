@@ -1,106 +1,69 @@
-/* Smart Auditing — gst-fetch service.
-   Runs the Playwright automation and exposes a small API the app calls:
-     GET  /health       -> { ok:true }
-     GET  /manifest     -> the automation manifest (storage layout, returns)
-     POST /fetch        -> { client, gstin, items, months } -> { id }  (starts a job)
-     GET  /status/:id   -> { status, progress, downloaded, uploaded, errors }
-   A minimal web UI at / lets you trigger and watch a fetch standalone.
+/* Smart Auditing portal helper: the small local service Smart Auditing talks to.
+   It listens on this computer only (127.0.0.1:8790) and answers only Smart Auditing's own site.
+     GET  /health            -> { ok, version, busy }
+     POST /fetch             -> { client, gstin, items:[GSTR1,GSTR2B,GSTR3B,TDS], months:[YYYY-MM], user?, tan?, tdsFrom? } -> { id }
+     GET  /status/:id        -> what the run is doing, each month's result, the files saved
+     GET  /file/:id/:n       -> one saved file (Smart Auditing reads it in)
+     GET  /challans/:id      -> the TDS challans read
+     POST /stop/:id          -> stop the run (a signed-in run logs out first)
+   Start it with "Start portal helper.cmd" (Windows) or: npm install && npm start */
+import http from 'node:http';
+import fs from 'node:fs';
+import { Run, downloadsRoot } from './runner.js';
 
-   Run:  npm install && npx playwright install chromium && npm start
-   Then open http://localhost:8790  (first run opens a browser for the one-time
-   GST sign-in; later runs are fully automatic). */
-import express from 'express';
-import cors from 'cors';
-import manifest from './manifest.js';
-import { runFetch } from './fetch.js';
+const VERSION = '2.0.0';
+const PORT = +process.env.PORT || 8790;
+/* Smart Auditing's site, and a copy run on this computer for testing; every other site is refused */
+const ORIGINS = [/^https:\/\/ameen14102002\.github\.io$/i, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i, ...(process.env.SA_ORIGIN ? [new RegExp('^' + process.env.SA_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i')] : [])];
+const runs = new Map(); let current = null;
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+const okOrigin = o => !o || ORIGINS.some(r => r.test(o));
+function send(res, code, body, type = 'application/json') {
+  res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+  res.end(type === 'application/json' ? JSON.stringify(body) : body);
+}
+function readBody(req) {
+  return new Promise((ok, no) => { let n = 0; const b = []; req.on('data', c => { n += c.length; if (n > 200000) { no(new Error('too large')); req.destroy(); } else b.push(c); }); req.on('end', () => { try { ok(JSON.parse(Buffer.concat(b).toString('utf8') || '{}')); } catch (e) { no(new Error('not JSON')); } }); });
+}
 
-const jobs = new Map();
-let seq = 0;
-
-app.get('/health', (_req, res) => res.json({ ok: true, service: 'gst-fetch', version: '1.0.0' }));
-app.get('/manifest', (_req, res) => res.json(manifest));
-
-app.post('/fetch', async (req, res) => {
-  const { client, gstin, items, months } = req.body || {};
-  if (!client || !gstin || !Array.isArray(items) || !Array.isArray(months))
-    return res.status(400).json({ error: 'client, gstin, items, months required' });
-  const id = 'j' + (++seq) + '-' + Date.now().toString(36);
-  const job = { id, status: 'running', client, gstin, items, months, progress: [], downloaded: 0, uploaded: 0, errors: [] };
-  jobs.set(id, job);
-  res.json({ id });
+const server = http.createServer(async (req, res) => {
+  const origin = req.headers.origin || '';
+  if (!okOrigin(origin)) return send(res, 403, { error: 'This helper answers Smart Auditing only.' });
+  if (origin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');   // Chrome / Edge: a web page asking a service on this computer
+    res.setHeader('Access-Control-Max-Age', '600');
+    res.writeHead(204); return res.end();
+  }
+  const url = new URL(req.url, 'http://127.0.0.1'), parts = url.pathname.split('/').filter(Boolean);
   try {
-    await runFetch(job);
-    job.status = 'done';
-  } catch (e) {
-    job.status = 'error';
-    job.errors.push(e.message);
-  }
-  jobs.set(id, job);
+    if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, service: 'smart-auditing-portal-helper', version: VERSION, busy: !!(current && current.status === 'running'), folder: downloadsRoot() });
+    if (req.method === 'POST' && url.pathname === '/fetch') {
+      if (current && current.status === 'running') return send(res, 409, { error: 'A portal run is already open (' + current.co + '). Finish or stop it first.', id: current.id });
+      const run = new Run(await readBody(req), () => {});
+      runs.set(run.id, run); current = run;
+      for (const [id, r] of runs) if (r !== run && r.status !== 'running' && Date.now() - r.at0 > 6 * 3600000) runs.delete(id);
+      run.start();
+      console.log(new Date().toLocaleTimeString(), 'run', run.id, run.co, run.items.length, 'returns', run.tds ? '+ TDS (' + run.tds + ')' : '');
+      return send(res, 200, { id: run.id });
+    }
+    const run = parts[1] && runs.get(parts[1]);
+    if (parts[0] === 'status' && req.method === 'GET') return run ? send(res, 200, run.view()) : send(res, 404, { error: 'No such run (the helper may have been restarted).' });
+    if (parts[0] === 'challans' && req.method === 'GET') return run ? send(res, 200, { rows: run.challans }) : send(res, 404, { error: 'No such run.' });
+    if (parts[0] === 'stop' && req.method === 'POST') { if (run) run.stop(); return send(res, 200, { ok: !!run }); }
+    if (parts[0] === 'file' && req.method === 'GET') {
+      const f = run && run.files[+parts[2]]; if (!f || !fs.existsSync(f.path)) return send(res, 404, { error: 'No such file.' });
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': fs.statSync(f.path).size, 'Cache-Control': 'no-store', 'X-File-Name': encodeURIComponent(f.name), 'Access-Control-Expose-Headers': 'X-File-Name' });
+      return fs.createReadStream(f.path).pipe(res);
+    }
+    if (req.method === 'GET' && url.pathname === '/') return send(res, 200, '<!doctype html><meta charset="utf-8"><title>Smart Auditing portal helper</title><body style="font:15px system-ui;margin:40px;max-width:560px"><h2>Smart Auditing portal helper is running</h2><p>Open Smart Auditing, go to the client\'s GST &amp; TDS page and click <b>Fetch from the portals</b>. Keep this window open while it works.</p><p>Files are saved in ' + downloadsRoot().replace(/&/g, '&amp;') + '.</p>', 'text/html; charset=utf-8');
+    send(res, 404, { error: 'Not found' });
+  } catch (e) { send(res, 400, { error: e.message || String(e) }); }
 });
-
-app.get('/status/:id', (req, res) => {
-  const j = jobs.get(req.params.id);
-  if (!j) return res.status(404).json({ error: 'no such job' });
-  res.json({ id: j.id, status: j.status, progress: j.progress, downloaded: j.downloaded, uploaded: j.uploaded, errors: j.errors });
+server.listen(PORT, '127.0.0.1', () => {
+  console.log('Smart Auditing portal helper ' + VERSION + ' on http://127.0.0.1:' + PORT);
+  console.log('Keep this window open. Start a fetch from Smart Auditing (GST & TDS page > Fetch from the portals).');
 });
-
-app.get('/', (_req, res) => res.type('html').send(UI));
-
-const PORT = process.env.PORT || 8790;
-app.listen(PORT, '0.0.0.0', () => console.log(`gst-fetch on http://0.0.0.0:${PORT}`));
-
-const monthsHtml = (() => {
-  const out = [];
-  for (let y = 2024; y <= 2026; y++) for (let m = 1; m <= 12; m++) {
-    const k = y + '-' + String(m).padStart(2, '0');
-    out.push('<label><input type="checkbox" class="mo" value="' + k + '"> ' + k + '</label>');
-  }
-  return out.join('');
-})();
-
-const returnsHtml = manifest.returns
-  .map(r => '<label><input type="checkbox" class="it" value="' + r.id + '" checked> ' + r.label + '</label>')
-  .join('') + '<label><input type="checkbox" class="it" value="TDS"> TDS challans (opens TRACES)</label>';
-
-const UI = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smart Auditing · GST fetch automation</title>
-<style>
-body{font:14px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;color:#1a2233}
-h1{font-size:18px}fieldset{border:1px solid #d0d7e2;border-radius:10px;padding:12px 14px;margin:12px 0}
-label{display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0}input[type=text]{width:100%;padding:7px;border:1px solid #ccd;border-radius:7px;margin:4px 0}
-button{padding:8px 16px;border:0;border-radius:8px;background:#2b6cb0;color:#fff;cursor:pointer}
-#log{white-space:pre-wrap;background:#0f1729;color:#cfe;padding:12px;border-radius:10px;min-height:60px;font:12px/1.5 ui-monospace,monospace}
-</style></head><body>
-<h1>Smart Auditing · GST fetch automation</h1>
-<p>Runs the Playwright downloader against the GST portal and stores the files in Supabase Storage for the app to read. First run opens a browser for the one-time GST sign-in.</p>
-<fieldset><legend>Client + GSTIN</legend>
-<input id="client" type="text" placeholder="Client name"><input id="gstin" type="text" placeholder="GSTIN">
-</fieldset>
-<fieldset><legend>What to fetch</legend>${returnsHtml}</fieldset>
-<fieldset><legend>Months (FY)</legend><div id="months">${monthsHtml}</div></fieldset>
-<button id="go">Start fetch</button> <span id="state"></span>
-<div id="log"></div>
-<script>
-var months=[];for(var y=2024;y<=2026;y++)for(var m=1;m<=12;m++){var k=y+'-'+String(m).padStart(2,'0');months.push(k)}
-var log=function(m){var el=document.getElementById('log');el.textContent+=(m+'\\n')};
-document.getElementById('go').onclick=async function(){
-  var items=[].slice.call(document.querySelectorAll('.it:checked')).map(function(x){return x.value});
-  var mos=[].slice.call(document.querySelectorAll('.mo:checked')).map(function(x){return x.value});
-  var body={client:document.getElementById('client').value,gstin:document.getElementById('gstin').value.toUpperCase(),items:items,months:mos};
-  document.getElementById('state').textContent='starting…';log('POST /fetch '+JSON.stringify(body));
-  var r=await fetch('/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  var data=await r.json();if(!data.id)return;log('job '+data.id);
-  var id=data.id;
-  var tick=async function(){var s=await(await fetch('/status/'+id)).json();
-    log('['+s.status+'] downloaded='+s.downloaded+' uploaded='+s.uploaded+(s.errors.length?' errors='+s.errors.length:''));
-    var last=s.progress.slice(-2);
-    for(var i=0;i<last.length;i++)log('  · '+(last[i].message||''));
-    document.getElementById('state').textContent=s.status;
-    if(s.status==='running')setTimeout(tick,2000);else log(s.status==='done'?'done ✓':'failed ✗');};
-  tick();
-};
-</script></body></html>`;
+server.on('error', e => { console.error(e.code === 'EADDRINUSE' ? 'The helper is already running (port ' + PORT + ' is in use).' : e.message); process.exit(1); });

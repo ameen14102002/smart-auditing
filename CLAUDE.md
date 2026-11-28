@@ -11,8 +11,12 @@ same piece of work. If you are working here and the change needs 1Go (its Smart 
 and change it too, then release 1Go (version bump; the owner publishes the release).
 
 The links between the two apps:
-- **Get from 1Go**: `handoffs` / `handoff_parts` and the `handoff_*` functions (migrations 0004, 0006); the onego:// link; the
-  portal CAPTCHA is typed here (`handoff_captcha*`).
+- **GST and TDS data no longer come from 1Go** (owner, 28 Nov 2026: "i dont want this app to depend on the 1go"). Smart Auditing
+  takes them itself with the **portal helper** in `gst-fetch/` (runs on the person's computer, 127.0.0.1:8790; packed as
+  `portal-helper.zip` by the Pages workflow). Its portal steps, `gst-fetch/page.js`, are generated from 1Go's
+  `src/portalpreload.js` (`npm run page` in gst-fetch): when 1Go's portal steps change, rebuild page.js here too. The person signs
+  in on the portal themselves; no password is asked for or kept; GSTR-2B over 1000 documents is taken as JSON (all parts).
+  The old handoff tables and functions (migrations 0004, 0006, 0010) are no longer used by the app.
 - **One sign-in and one client master**: edge function `supabase/functions/onego-bridge` (verify_jwt off; it checks the 1Go
   sign-in and `my_access`, including `audit`, on 1Go's server). Deploy it after any change.
 - **Access**: only the 1Go owner and users the owner switched Smart Auditing on for (1Go › Users) see the tile or can use the bridge.
