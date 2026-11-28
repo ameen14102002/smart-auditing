@@ -54,29 +54,14 @@ body.auth .app{display:block;background:none}
 body.auth #main{padding:0;max-width:none}
 .auth-wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);min-height:100vh;
   background-color:#0a1834;position:relative;isolation:isolate;overflow:hidden}
-/* living background: photo revealed and steady (no zoom, no pulse); thin lines glide across it */
-.auth-wrap::before{content:"";position:absolute;inset:-6%;z-index:-1;pointer-events:none;
-  background-image:
-    linear-gradient(112deg,transparent 49%,rgb(180 255 235 / .26) 50%,transparent 51%),
-    linear-gradient(100deg,rgb(10 24 52 / .8) 0%,rgb(10 24 52 / .45) 45%,rgb(10 24 52 / .16) 100%),
-    url(auth-bg.jpg);
-  background-size:260% 100%,100% 100%,cover;
-  background-position:130% 0,0 0,center;
-  background-repeat:no-repeat;
-  filter:saturate(1.2);
-  animation:linedrift 12s linear infinite}
-.auth-wrap::after{content:"";position:absolute;inset:-8%;z-index:-1;pointer-events:none;
-  background-image:
-    linear-gradient(105deg,transparent 48.5%,rgb(23 135 90 / .5) 50%,transparent 51.5%),
-    linear-gradient(105deg,transparent 61%,rgb(79 118 255 / .34) 62.5%,transparent 64%),
-    radial-gradient(ellipse 55% 45% at 76% 84%,rgb(23 135 90 / .35),rgb(23 135 90 / 0) 70%),
-    radial-gradient(ellipse 50% 42% at 16% 16%,rgb(47 75 216 / .45),rgb(47 75 216 / 0) 72%);
-  background-size:260% 100%,260% 100%,100% 100%,100% 100%;
-  background-repeat:no-repeat;
-  animation:greendrift 11s linear infinite,glowdrift 13s ease-in-out infinite alternate}
-@keyframes linedrift{from{background-position:130% 0,0 0,center}to{background-position:-30% 0,0 0,center}}
-@keyframes greendrift{from{background-position:130% 0,-30% 0,0 0,0 0}to{background-position:-30% 0,130% 0,0 0,0 0}}
-@keyframes glowdrift{from{transform:translate3d(0,0,0);opacity:.5}to{transform:translate3d(-6%,2%,0);opacity:.9}}
+/* background (owner, 28 Nov 2026): no added lines, flashes or shine. The photo's own lines move: the photo drifts slowly
+   along the direction of its lines, back and forth, without zoom. A still shade keeps the wording readable. */
+.auth-wrap::before{content:"";position:absolute;inset:-7%;z-index:-2;pointer-events:none;
+  background:url(auth-bg.jpg) center/cover no-repeat;filter:saturate(1.15);
+  will-change:transform;animation:photodrift 38s ease-in-out infinite alternate}
+.auth-wrap::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(100deg,rgb(10 24 52 / .78) 0%,rgb(10 24 52 / .42) 45%,rgb(10 24 52 / .14) 100%)}
+@keyframes photodrift{0%{transform:translate3d(3%,2%,0)}50%{transform:translate3d(-1%,-1%,0)}100%{transform:translate3d(-4%,-2.5%,0)}}
 
 /* ---------- opening intro: book → search → logo → wording → card ---------- */
 .auth-wrap.intro .brandrow .logoimg,.auth-wrap.intro .wordmark,.auth-wrap.intro .auth-brand h1,
@@ -127,7 +112,7 @@ body.auth #main{padding:0;max-width:none}
 .auth-wrap.intro.st-logo #intro-fx .i-shine::after{animation:shineGo 1s cubic-bezier(.4,0,.2,1) .15s both}
 @keyframes shineGo{to{left:130%}}
 .auth-brand{background:transparent;color:#dfe6fb;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden}
-.auth-brand::before{content:"";position:absolute;top:0;bottom:0;left:38px;width:1px;background:rgb(201 58 46 / .45)}
+.auth-brand::before{content:none}
 .auth-brand .logoimg{position:relative}
 .auth-brand h1{font:600 clamp(30px,3.4vw,44px)/1.1 var(--serif);color:#fff;letter-spacing:-.015em;margin:28px 0 14px;max-width:18ch;position:relative}
 .auth-brand .lede{font-size:17px;line-height:1.55;max-width:42ch;color:#c4cff0;margin:0 0 34px;position:relative}
