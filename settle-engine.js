@@ -69,13 +69,25 @@ function build(V,skipped){
 /* allocations of one entry under the same name are one bill (a bill with its TDS deduction inside: +50,559.06 and −857) */
 const netAl=al=>{if(al.length<2)return al;const m=new Map();for(const [n,ty,a,dr,cp] of al){const k=core(n)+'|'+(ty==='A'?'A':'N');const x=m.get(k);const v=dr?a:-a;if(x){x[2]+=v}else m.set(k,[n,ty,v,0,cp])}
   return[...m.values()].filter(x=>Math.abs(x[2])>0.005).map(([n,ty,v,,cp])=>[n,ty,R2(Math.abs(v)),v>0?1:0,cp])};
+/* ledgers kept bill-wise that are not customers or suppliers: expenses, rent, loans, staff costs (never in a sales or purchase bill) */
+const NONTRADE=/expense|charges|\bloan\b|\brent\b|salary|salaries|wages|\btea\b|coffee|\bmilk\b|travel|telephone|\bmobile\b|internet|electricity|\beb\b|freight|transport|labour|insurance|stationery|printing|meeting|carpent|\bporter\b|repair|maintenance|\bstaff\b|conveyance|postage|courier|fuel|petrol|diesel|\bsim\b|refreshment|donation|advertis|professional fees|audit fees|\bemi\b|depreciation|capital|drawings/i,
+  /* names that are never a supplier or customer, even when used as the party of an expense bill (a "GST ITC" voucher) */
+  NONTRADE_ALWAYS=/\bexpenses?\b|charges\b|\bloan\b|\brent\b|salar|wages|\bstaff\b|insurance|\bemi\b|depreciation|drawings|capital a\/?c|\bcapital\b/i;
 function calc(D,side,opt={}){
   const tol=1,credit=+opt.days||(side==='S'?30:45);
+  /* the ageing date: the day the work is done, or the end of the month chosen. Entries dated after it (future-dated payments
+     entered ahead in Tally, later bills) have not happened yet on that day: they are left out of the matching and counted */
+  const asOf=/^\d{4}-\d{2}-\d{2}$/.test(opt.asOf||'')?opt.asOf:'';let after={n:0,amt:0,to:''};
+  if(asOf&&D.to>asOf){const mine=side==='S'?/^(s|cn|r|j)$/:/^(p|dn|y|j)$/;for(const p of D.P)if(p[0]>asOf&&mine.test(p[1])){after.n++;after.amt=R2(after.amt+p[6]);if(p[0]>after.to)after.to=p[0]}
+    D={...D,P:D.P.filter(p=>p[0]<=asOf),X:(D.X||[]).filter(x=>x[0]<=asOf),to:asOf}}
   const role={};for(const p of D.P){const r=role[p[4]]=role[p[4]]||{s:0,p:0,r:0,y:0,dr:0,cr:0};if(p[1]==='s'||p[1]==='cn')r.s+=p[6];else if(p[1]==='p'||p[1]==='dn')r.p+=p[6];else if(p[1]==='r')r.r+=p[6];else if(p[1]==='y')r.y+=p[6];if(p[5])r.dr+=p[6];else r.cr+=p[6]}
   const sideOf=n=>{const r=role[n];if(r.s||r.p)return r.s>=r.p?'S':'P';if(r.r&&!r.y)return'S';if(r.y&&!r.r)return'P';return r.dr>=r.cr?'S':'P'};
   const both=Object.keys(role).filter(n=>role[n].s&&role[n].p),bothSet=new Set(both);
   const pSide=p=>bothSet.has(p[4])?(/^(s|cn|r)$/.test(p[1])?'S':/^(p|dn|y)$/.test(p[1])?'P':sideOf(p[4])):sideOf(p[4]);
-  const billDr=side==='S'?1:0,parties={};for(const p of D.P)if(pSide(p)===side)(parties[p[4]]=parties[p[4]]||[]).push(p);
+  const billDr=side==='S'?1:0,parties={},nonTrade={};
+  for(const p of D.P){if(pSide(p)!==side)continue;const n=p[4],r=role[n];
+    if((!r.s&&!r.p&&NONTRADE.test(n))||NONTRADE_ALWAYS.test(n)){const x=nonTrade[n]=nonTrade[n]||{party:n,n:0,dr:0,cr:0};x.n++;if(p[5])x.dr=R2(x.dr+p[6]);else x.cr=R2(x.cr+p[6]);continue}
+    (parties[n]=parties[n]||[]).push(p)}
   const bills=[],pool=[],opening=[],over=[],allU=[],tie=[];
   const KIND={s:'Sales',p:'Purchase',r:'Receipt',y:'Payment',cn:'Credit note',dn:'Debit note',j:'Journal'};
   for(const [name,L] of Object.entries(parties)){L.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
@@ -135,6 +147,6 @@ function calc(D,side,opt={}){
   const mis=[];for(const u of pool){const hit=openB.find(b=>b.party!==u.party&&Math.abs(b.rem-u.rem)<=tol&&Math.abs(dd(u.d,b.d))<=90);if(hit)mis.push({u,b:hit})}
   const to=D.to,ageOf=b=>dd(to,b.d),late=[];
   for(const b of bills){b.days=b.rem<=tol&&b.by.length?Math.max(0,dd(b.by[b.by.length-1].d,b.d)):null;b.cr=b.cp||credit;if(b.days!=null&&b.days>b.cr)late.push(b)}
-  return{side,credit,bills,pool,allU,opening,over,mis,late,elsewhere,both:both,to,from:D.from,parties:Object.keys(parties).length,ageOf,tie}}
-const API={parse,build,calc,core,nameKey,nn,R2};
+  return{side,credit,bills,pool,allU,opening,over,mis,late,elsewhere,both:both,to,from:D.from,parties:Object.keys(parties).length,ageOf,tie,asOf:asOf||to,after,nonTrade:Object.values(nonTrade).sort((a,b)=>Math.abs(b.dr-b.cr)-Math.abs(a.dr-a.cr))}}
+const API={parse,build,calc,core,nameKey,nn,R2,NONTRADE};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.SETTLE=API})(typeof window!=='undefined'?window:globalThis);

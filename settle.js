@@ -18,9 +18,22 @@ async function settleImport(c,file,text){
   await savep({...d,settle:{file:file.name,at:new Date().toISOString(),from:D.from,to:D.to,P:D.P.slice(0,80000),X:D.X.slice(0,20000),stats:D.stats,opt:d.settle?.opt||{},v:2}});
   _stMemo={};return D.P}
 let _stMemo={};
-function settleCalc(d,side){
-  const S0=d.settle;if(!S0?.P?.length)return null;const key=S0.at+side+JSON.stringify(S0.opt||{});if(_stMemo[key])return _stMemo[key];
-  const r=SETTLE.calc({P:S0.P,X:S0.X||[],from:S0.from,to:S0.to},side,{days:+(S0.opt?.[side+'days'])||0});
+/* the ageing date (owner, 28 Nov 2026): the day the work is done, or the end of the month chosen; never a date after today, so
+   entries dated ahead in Tally (payments keyed in for later) are not taken as paid */
+const stToday=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')};
+const stMonthEnd=ym=>{const [y,m]=ym.split('-').map(Number);return ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0')};
+const ST_MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+/* the month of the audit, from its period ("october", "Oct 2026", "Apr–Sep 2026"): the last month named; the year named, else the latest such month up to now (this month: to date) */
+function stAuditMonth(){const a=typeof A==='function'?A():null,t=String(a?.period||'').toLowerCase();if(!t)return'';
+  let mi=-1,at=-1;ST_MON.forEach((m,i)=>{const re=new RegExp('\\b'+m,'g');let x;while((x=re.exec(t)))if(x.index>at){at=x.index;mi=i}});if(mi<0)return'';
+  const ys=t.match(/20\d\d/g),today=stToday();let y=ys?+ys[ys.length-1]:+today.slice(0,4);
+  if(ys&&/20\d\d\s*[-–\/]\s*\d{2}\b/.test(t)&&!/20\d\d\s*$/.test(t.trim())){const fy=+t.match(/(20\d\d)\s*[-–\/]\s*\d{2}\b/)[1];y=mi>=3?fy:fy+1}
+  let ym=y+'-'+String(mi+1).padStart(2,'0');if(!ys)while(ym>today.slice(0,7)){y--;ym=y+'-'+String(mi+1).padStart(2,'0')}return ym}
+function stAsOf(d){const o=d?.settle?.opt||{},today=stToday();let v=o.asOn||stAuditMonth()||'today';
+  const x=/^\d{4}-\d{2}$/.test(v)?stMonthEnd(v):/^\d{4}-\d{2}-\d{2}$/.test(v)?v:today;return x>today?today:x}
+function settleCalc(d,side,asOf){
+  const S0=d.settle;if(!S0?.P?.length)return null;asOf=asOf||stAsOf(d);const key=S0.at+side+asOf+JSON.stringify(S0.opt||{});if(_stMemo[key])return _stMemo[key];
+  const r=SETTLE.calc({P:S0.P,X:S0.X||[],from:S0.from,to:S0.to},side,{days:+(S0.opt?.[side+'days'])||0,asOf});
   if(Object.keys(_stMemo).length>6)_stMemo={};_stMemo[key]=r;return r}
 const pl=(n,one,many)=>n+' '+(n===1?one:many);
 const HOW={ref:['g','Closed by bill reference'],adv:['g','Closed against advance (bill reference)'],round:['g','Rounding (₹1 or less)'],
@@ -45,12 +58,12 @@ const bucket=n=>n<=30?'0–30':n<=60?'31–60':n<=90?'61–90':n<=180?'91–180'
 function stSummary(r,mk){
   const inM=x=>!mk||x.d.slice(0,7)===mk,B=r.bills.filter(inM),sum=L=>R2(L.reduce((s,b)=>s+b.amt,0)),sumR=L=>R2(L.reduce((s,b)=>s+b.rem,0));
   const t1=B.filter(b=>tierOf(b.how)===1),t2=B.filter(b=>tierOf(b.how)===2),t3=B.filter(b=>tierOf(b.how)===3),op=B.filter(b=>b.rem>1),pl=r.pool.filter(inM);
-  return{B,t1,t2,t3,op,pl,sum,sumR,notRef:B.filter(b=>tierOf(b.how)!==1)}}
+  return{B,t1,t2,t3,op,pl,sum,sumR,notRef:B.filter(b=>tierOf(b.how)!==1&&b.how!=='open'),settled:B.filter(b=>b.how!=='open')}}
 
 /* ---------- findings that become observations ---------- */
 function stFlags(r){
-  const S=r.side==='S',W=S?{b:'sale',bs:'sales bills',st:'receipt',sts:'receipts',p:'customer'}:{b:'purchase',bs:'purchase bills',st:'payment',sts:'payments',p:'supplier'},F=[],s=stSummary(r),pct=s.B.length?Math.round(s.notRef.length/s.B.length*100):0;
-  if(s.notRef.length&&pct>=10)F.push({k:'noref',r:pct>=40?'H':'M',t:`${pct}% of ${W.bs} not closed bill-wise in Tally`,c:`${s.notRef.length} of ${s.B.length} ${W.bs} (${inr(s.sum(s.notRef))}) were not settled against their bill reference. ${inr(R2(s.B.reduce((t,b)=>t+Math.max(0,b.t0-b.rem),0)))} shown pending in Tally is not a real outstanding: it was settled by party and amount or on account. ${s.t2.length} were matched only by party and amount, ${s.t3.length} on account, ${s.op.length} are open.`,
+  const S=r.side==='S',W=S?{b:'sale',bs:'sales bills',st:'receipt',sts:'receipts',p:'customer'}:{b:'purchase',bs:'purchase bills',st:'payment',sts:'payments',p:'supplier'},F=[],s=stSummary(r),pct=s.settled.length?Math.round(s.notRef.length/s.settled.length*100):0;   /* of the bills settled by the ageing date: a bill still open is not a bill-wise failure */
+  if(s.notRef.length&&pct>=10)F.push({k:'noref',r:pct>=40?'H':'M',t:`${pct}% of ${W.bs} not closed bill-wise in Tally`,c:`${s.notRef.length} of the ${s.settled.length} ${W.bs} settled by ${fmtD(r.asOf||r.to)} (${inr(s.sum(s.notRef))}) were not settled against their bill reference. ${inr(R2(s.B.reduce((t,b)=>t+Math.max(0,b.t0-b.rem),0)))} shown pending in Tally is not a real outstanding: it was settled by party and amount or on account. ${s.t2.length} were matched only by party and amount, ${s.t3.length} on account, ${s.op.length} are open.`,
     cr:`${S?'Receipts':'Payments'} should be adjusted against the bills they settle (bill-wise details, Agst Ref) so that outstanding ${S?'receivables':'payables'} and their ageing are reliable.`,e:`Outstanding by bill and ageing in Tally are not reliable; ${S?'overdue debts and disputes':'duplicate payments and MSME dues'} can go unnoticed.`,rec:`Enforce bill-wise adjustment for every ${W.st}; clear on-account items against bills monthly; review the ${W.p} ledgers with on-account balances.`});
   if(r.over.length)F.push({k:'over',r:'H',t:`${pl(r.over.length,W.b+' bill',W.bs)} settled for more than billed`,c:r.over.slice(0,10).map(o=>`${o.party}: bill ${o.ref||o.bill.vno} ${inr(o.bill.amt)}, ${W.sts} against it exceed by ${inr(o.excess)} (${o.vt} ${o.vno}, ${fmtD(o.d)})`).join('; '),
     cr:`A bill cannot be settled for more than its amount.`,e:S?'Excess collection or a receipt posted to the wrong bill or party.':'Possible duplicate or excess payment to the supplier.',rec:`Verify each case with the ${W.p}'s statement; recover or adjust the excess; correct the bill references.`});
@@ -73,6 +86,10 @@ function stFlags(r){
     c:nr.slice(0,12).map(b=>`${b.party} ${b.ref||b.vno}: ${inr(b.amt)} billed, ${b.diff>0?'short by':'more by'} ${inr(Math.abs(b.diff))}`).join('; '),cr:'Short receipts are written off only with approval; bank charges are booked.',e:'Small differences pile up in party balances.',rec:'Book bank charges or approved write-offs against these bills.'});
   const tn=(r.tie||[]).filter(x=>Math.abs(x.diff)>1);if(tn.length)F.push({k:'tie',r:'M',t:`${pl(tn.length,'party does','parties do')} not tie back to the books`,c:tn.slice(0,10).map(x=>`${x.party}: difference ${inr(x.diff)}`).join('; '),cr:'Every party\'s movement in the period equals its open bills less unmatched credits.',e:'The analysis of these parties may be incomplete.',rec:'Look at these ledgers in Tally; send the file to support if it persists.'});
   if(r.both.length)F.push({k:'both',r:'L',t:r.both.length===1?'1 party is both a customer and a supplier':`${r.both.length} parties are both customers and suppliers`,c:r.both.slice(0,15).join(', '),cr:'Related transactions with the same party are approved; set-off only with agreement.',e:'Netting can hide balances; related-party risk.',rec:'Check approvals and any set-off agreement; review for related parties.'});
+  if(r.after?.n)F.push({k:'after',r:'L',t:`${pl(r.after.n,'entry','entries')} dated after the ageing date (${fmtD(r.asOf)}) left out of the ageing`,c:`${inr(r.after.amt)} of ${W.sts}, bills and journals dated from the day after ${fmtD(r.asOf)} up to ${fmtD(r.after.to)}${r.after.to>stToday()?' (later than today: keyed in Tally ahead of their date)':''}. They had not happened on the ageing date, so the bills they close are shown as still open then.`,
+    cr:'Entries are recorded on the date they happen.',e:S?'Receipts dated ahead make customers look paid before the money comes.':'Payments dated ahead make suppliers look paid before the money goes; the outstanding in Tally is understated until then.',rec:`Confirm with the client what the later-dated entries are (scheduled or post-dated ${W.sts}); record each on the day it is made.`});
+  if(r.nonTrade?.length)F.push({k:'nontrade',r:'L',t:`${pl(r.nonTrade.length,'expense or loan ledger','expense and loan ledgers')} kept bill-wise left out of the ${W.p} ageing`,c:r.nonTrade.slice(0,15).map(x=>`${x.party} (${inr(Math.abs(R2(x.dr-x.cr)))} ${x.dr>=x.cr?'Dr':'Cr'})`).join('; ')+(r.nonTrade.length>15?' …':''),
+    cr:`Only ${W.p}s are aged; expenses, rent, loans and staff costs are not ${W.p} balances.`,e:'Left in, their payments would show as advances to suppliers and their bills as amounts owed to trade creditors.',rec:'Review these ledgers on their own (expense provisions, loan schedule); keep bill-wise details only where needed.'});
   return F}
 
 /* ---------- screen ---------- */
@@ -91,6 +108,8 @@ function settleTab(c,d){
   return drop+`<div class="row" style="gap:10px;margin-bottom:12px"><div class="seg" role="group"><button class="${side==='S'?'on':''}" data-act="stSide" data-v="S">Sales vs receipts</button><button class="${side==='P'?'on':''}" data-act="stSide" data-v="P">Purchases vs payments</button></div>
     <select data-stm="1" style="width:auto;max-width:240px"><option value="">Bills of every month</option>${months.map(m=>`<option value="${m}" ${m===mk?'selected':''}>Bills of ${mkLabel(m)}</option>`).join('')}</select>
     <select data-stp="1" style="width:auto;max-width:280px"><option value="">Every ${W.p.toLowerCase()}</option>${names.map(n=>`<option ${n===party?'selected':''}>${esc(n)}</option>`).join('')}</select><span class="sp"></span>
+    <label class="small muted">Ageing as on <select data-stason="1" style="width:auto">${(()=>{const t=stToday(),cur=S0.opt?.asOn||stAuditMonth()||'today',am=stAuditMonth(),ms=[];let m=String(S0.from||t).slice(0,7);while(m<=t.slice(0,7)&&ms.length<36){ms.push(m);const [y,mm]=m.split('-').map(Number);m=mm===12?(y+1)+'-01':y+'-'+String(mm+1).padStart(2,'0')}
+      return `<option value="today" ${cur==='today'?'selected':''}>Today, ${fmtD(t)}</option>`+ms.reverse().map(x=>`<option value="${x}" ${cur===x?'selected':''}>End of ${mkLabel(x)}${x===am?' (audit month)':''}${stMonthEnd(x)>t?' (to date)':''}</option>`).join('')})()}</select></label>
     <label class="small muted">Credit period <input type="number" min="0" max="365" data-stdays="${side}" value="${r.credit}" style="width:70px"> days</label><button class="btn ghost sm" data-act="stXlsx">${ic('down')}Excel</button></div>
    <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${tile(s.B.length,W.bills,inr(s.sum(s.B)),'all')}${tile(s.t1.length,'Closed by bill reference',inr(s.sum(s.t1)),'t1')}${tile(s.t2.length,'Not by bill: party and amount',inr(s.sum(s.t2)),'t2')}${tile(s.t3.length,'Not by bill: on account',inr(s.sum(s.t3)),'t3')}${tile(s.op.length,'Open bills',inr(s.sumR(s.op)),'open',s.op.length?'alert':'')}${tile(s.pl.length,W.st+' not matched to a bill',inr(R2(s.pl.reduce((a,u)=>a+u.rem,0))),'un',s.pl.length?'alert':'')}</div>
    ${s.B.length?`<div class="progress" style="height:10px;margin:14px 0 4px;display:flex" title="How the bills were closed"><span style="width:${s.t1.length/s.B.length*100}%;background:var(--ok)"></span><span style="width:${s.t2.length/s.B.length*100}%;background:var(--acc)"></span><span style="width:${s.t3.length/s.B.length*100}%;background:#d39b00"></span><span style="width:${s.op.length/s.B.length*100}%;background:var(--hi)"></span></div>
@@ -101,7 +120,7 @@ function settleTab(c,d){
    :`<div class="scroll"><table><thead><tr><th>Bill date</th><th>Bill</th><th>${W.p}</th><th class="num">Amount</th><th>Settled by · days after the bill · booked as</th><th>How it was closed</th><th class="num">Days to close</th><th class="num">Open</th></tr></thead><tbody>${shown.map(b=>`<tr><td>${fmtD(b.d)}</td><td>${esc(b.vt)} ${esc(b.vno)}${b.ref&&b.ref!==b.vno?`<div class="small muted">Ref ${esc(b.ref)}</div>`:''}<div class="small muted">Booked as ${esc(BOOK[b.ty]??'No bill details')}</div>${b.orphan?'<div class="small" style="color:var(--hi)">Agst Ref to a bill not in this file</div>':''}</td><td>${esc(b.party)}</td><td class="num">${inr(b.amt)}</td><td class="small">${by(b)}</td><td><span class="tag ${HW[b.how][0]}">${HW[b.how][1]}</span></td><td class="num">${b.days==null?'—':b.days>b.cr?`<b style="color:var(--hi)">${b.days}</b>`:b.days}</td><td class="num">${b.rem>1?`<b>${inr(b.rem)}</b><div class="small muted">${r.ageOf(b)} days</div>`:'—'}${b.t0-b.rem>1?`<div class="small" style="color:var(--ok)">${inr(R2(b.t0-b.rem))} pending in Tally, not real</div>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No bills in this selection.</td></tr>'}</tbody></table></div>${L.length>shown.length?`<p><button class="btn ghost sm" data-act="stAll">Show all ${L.length} bills</button></p>`:''}`}
    ${(()=>{const md=ui.stAge==='tally'?'tally':'real',AG=stAgeing(r,null,md),AR=stAgeing(r),E=Object.entries(AG).filter(([n])=>!party||n===party).sort((a,b)=>b[1].net-a[1].net),T=E.reduce((t,[,p])=>{t.bill+=p.bill;t.adv+=p.adv;t.acc+=p.acc;t.net+=p.net;p.age.forEach((v,i)=>t.age[i]+=v);return t},{bill:0,adv:0,acc:0,net:0,age:[0,0,0,0,0]}),cell=v=>Math.abs(v)<=1?'—':v<0?`<span style="color:var(--ok)">(${inr(R2(-v))})</span>`:inr(R2(v));
      const tt=Object.values(AR).reduce((t,p)=>{t.tally+=p.tally;t.nr+=p.notReal;t.real+=p.real;return t},{tally:0,nr:0,real:0});
-     return `<h2 class="section">Ageing as on ${fmtD(r.to)}</h2>
+     return `<h2 class="section">Ageing as on ${fmtD(r.asOf||r.to)}</h2>
      <div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px"><div class="kpi"><b>${inr(R2(tt.tally))}</b><span>Bills pending as per Tally (bill-wise)</span></div><button class="kpi" data-act="stF" data-v="nr" style="text-align:left;cursor:pointer;${f==='nr'?'outline:2px solid var(--acc);':''}"><b style="color:var(--ok)">${inr(R2(tt.nr))}</b><span>Not a real outstanding: settled by party and amount, not closed in Tally</span></button><div class="kpi alert"><b>${inr(R2(tt.real))}</b><span>Real outstanding</span></div></div>
      <div class="row" style="gap:10px;margin-bottom:8px"><div class="seg" role="group"><button class="${md==='real'?'on':''}" data-act="stAge" data-v="real">Real ageing</button><button class="${md==='tally'?'on':''}" data-act="stAge" data-v="tally">Ageing as per Tally</button></div><span class="small muted sp">${md==='real'?'After matching: what is truly unpaid, and advances or on-account amounts not matched to any bill.':'As the books stand: bills not knocked off bill-wise, and every amount booked on account or as advance not adjusted in Tally.'} Credits are shown in brackets.</span></div>
      <div class="scroll"><table><thead><tr><th>${W.p}</th><th class="num">Open bills<br><span class="small muted">against bill</span></th><th class="num">Advances<br><span class="small muted">not adjusted</span></th><th class="num">On account<br><span class="small muted">not adjusted</span></th><th class="num">Net outstanding</th>${md==='real'?'<th class="num">Pending in Tally<br><span class="small muted">not real</span></th>':''}<th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">91–180</th><th class="num">Over 180</th></tr></thead><tbody>
@@ -132,7 +151,8 @@ function stSheets(d,side){const r=settleCalc(d,side);if(!r)return[];const HW=sid
   const pre=side==='S'?'Sales ':'Purchases ';
   return[[pre+'real ageing',ag],[pre+'ageing as per Tally',at],[pre+'to close in Tally',CL],[pre+'bill vs '+W[1].toLowerCase(),L],[pre+'findings',F]]}
 ;
-document.addEventListener('change',e=>{const t=e.target,ds=t.dataset;if(ds.stm){ui.stM=t.value;ui.stAll=false;return render()}if(ds.stp){ui.stP=t.value;return render()}
+document.addEventListener('change',e=>{const t=e.target,ds=t.dataset;if(!(ds.stm||ds.stp||ds.stdays||ds.stason))return;if(ds.stm){ui.stM=t.value;ui.stAll=false;return render()}if(ds.stp){ui.stP=t.value;return render()}
+  if(ds.stason){const c=C(),d=pOpen(c);d.settle.opt={...(d.settle.opt||{}),asOn:t.value};_stMemo={};savep(d);return render()}
   if(ds.stdays){const c=C(),d=pOpen(c);d.settle.opt={...(d.settle.opt||{}),[ds.stdays+'days']:Math.max(0,+t.value||0)};savep(d);render()}});
 
 /* ---------- hooks ---------- */
@@ -156,7 +176,7 @@ const _progRepS=programmeReport;programmeReport=function(a){let h=_progRepS(a);c
 
 /* the debtors and creditors ageing (Debtors / Creditors procedures) uses the same matching when the bill-wise file covers the date */
 const _partyCalcS=partyCalc;partyCalc=function(d,s,name){const x=_partyCalcS(d,s,name);
-  if(!d.settle?.P?.length)return x;const r=settleCalc(d,s==='dr'?'S':'P');if(!r||x.asOf<r.to)return x;const p=stAgeing(r,x.asOf)[name];if(!p)return x;
+  if(!d.settle?.P?.length)return x;const r=settleCalc(d,s==='dr'?'S':'P',x.asOf&&x.asOf<stToday()?x.asOf:stToday());if(!r)return x;const p=stAgeing(r,x.asOf)[name];if(!p)return x;
   return{...x,age:p.age.map(v=>R2(Math.max(0,v))),adv:R2(p.adv+p.acc),billwise:p,over45:R2(r.bills.filter(b=>b.party===name&&b.rem>1&&dayDiff(x.asOf,b.d)>45).reduce((t,b)=>t+b.rem,0))}};
 const _partyTabS=partyTab;partyTab=function(c,d,s){const h=_partyTabS(c,d,s);if(!d.settle?.P?.length)return h;
   return h.replace(/Ageing is worked out first-in, first-out from the [^<]*in the books\./,'Ageing is from the bill-wise matching of the Tally file: against the bill first, then by party and amount, then on account. Advances and on-account amounts not adjusted are shown under the party name.')};

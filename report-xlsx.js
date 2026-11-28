@@ -52,6 +52,7 @@ function procFacts(a,c,k){
   return facts}
 function flagAmt(r,f){const S=x=>R2(x.reduce((t,v)=>t+v,0));switch(f.k){
   case'noref':return S(r.bills.map(b=>Math.max(0,b.t0-b.rem)));case'over':return S(r.over.map(o=>o.excess));case'mis':return S(r.mis.map(m=>m.u.rem));
+  case'after':return R2(r.after?.amt||0);case'nontrade':return null;
   case'adv':return S(r.pool.filter(u=>r.ageOf(u)>90).map(u=>u.rem));case'old':return S(r.bills.filter(b=>b.rem>1&&r.ageOf(b)>180).map(b=>b.rem));case'misref':return S(r.bills.filter(b=>b.misref).map(b=>b.amt));
   case'else':return S((r.elsewhere||[]).map(x=>x.amt));case'near':return S(r.bills.filter(b=>b.diff).map(b=>Math.abs(b.diff)));case'open':return S(r.opening.map(o=>o.amt));default:return null}}
 const sameT=(f,o)=>f===o||String(f).replace(/^(Sales|Purchases): /,'')===o;
@@ -212,7 +213,7 @@ function gstBlock(x,f){x.section('Each comparison');
 function detailSheets(p,SUM){const {a,c,k}=p;let L=[];try{L=k==='settle'?[...stSheets(pOpen(c),'S'),...stSheets(pOpen(c),'P')].filter(x=>!/findings/i.test(x[0])):k==='chk'?[]:procSheets(a,c,k)}catch(e){L=[]}
   return L.filter(x=>x[1]&&x[1].length>1).map(([n,rows],i)=>{const name=p.sheet.split(' ')[0]+'.'+(i+1)+' '+n.replace(/^(GST|TDS|Vouching|Debtors|Creditors) – /,'');
     const head=rows[0],nc=head.length,w=[2,...head.map((h,j)=>Math.min(48,Math.max(10,String(h).length+2,...rows.slice(1,300).map(r=>String(r[j]??'').length+2))))];
-    const x=new RS(name,w);x.tab='FFB8C2E0';x.title(n.replace(/^(GST|TDS|Vouching|Debtors|Creditors) – /,''),p.c.name+'  ·  detail of "'+p.f.name+'"',SUM);
+    const x=new RS(name,w);x.tab='FFB8C2E0';x.title(n.replace(/^(GST|TDS|Vouching|Debtors|Creditors) – /,''),p.c.name+'  ·  detail of "'+p.f.name+'"'+(k==='settle'&&/ageing|bill vs/i.test(n)?'  ·  as on '+fmtD(stAsOf(pOpen(c))):''),SUM);
     const isDate=j=>rows.slice(1,50).some(r=>/^\d{4}-\d{2}-\d{2}$/.test(String(r[j]??'')));const isNum=j=>rows.slice(1,80).filter(r=>r[j]!==''&&r[j]!=null).every(r=>typeof r[j]==='number');
     const cols=head.map((h,j)=>({h:String(h),at:colLetter(j+1),k:isDate(j)?'d':isNum(j)&&/amount|₹|taxable|tax|igst|cgst|sgst|cess|outstanding|pending|billed|applied|open|real|advance|account|total|value|balance|difference|net|days|0-30|31-60|61-90|91-180|over 180/i.test(h)&&!/days between|credit period|age|days/i.test(h)?'n2':isNum(j)?'n':'t'}));
     const body=rows.slice(1).map(r=>head.map((_,j)=>{const v=r[j]??'';if(typeof v==='string'&&v.length<70){const t=toneOf(v);if(t)return{v,s:{okT:'okC',warnT:'warnC',badT:'badC'}[t]}}return v}));
