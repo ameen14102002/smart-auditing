@@ -25,6 +25,9 @@ const dayOf=s=>{s=String(s||'');return s.length===8&&/^\d+$/.test(s)?s.slice(0,4
 function parse(text,o={}){
   const V=[],groups={},skipped={};let m;
   const lre=/<LEDGER NAME="([^"]*)"[\s\S]*?<\/LEDGER>/g;while((m=lre.exec(text))){const p=xtag(m[0],'PARENT');if(p)groups[dec(m[1])]=p}
+  /* a ledger under a group of the firm's own ("Staff Welfare" under "Indirect Expenses"): the whole line of groups is kept */
+  const gp={},gre=/<GROUP NAME="([^"]*)"[\s\S]*?<\/GROUP>/g;while((m=gre.exec(text))){const p=xtag(m[0],'PARENT');if(p)gp[dec(m[1])]=p}
+  if(Object.keys(gp).length)for(const l of Object.keys(groups)){let g=groups[l],chain=[g],n=0;while(gp[g]&&n++<8){g=gp[g];chain.push(g)}groups[l]=chain.join(' › ')}
   const re=/<VOUCHER[\s>]/g;
   while((m=re.exec(text))){const e=text.indexOf('</VOUCHER>',m.index);if(e<0)break;const b=text.slice(m.index,e);re.lastIndex=e+10;
     if(/<ISCANCELLED>Yes</i.test(b)||/<ISOPTIONAL>Yes</i.test(b)||/<ISDELETED>Yes</i.test(b)){skipped.cancelled=(skipped.cancelled||0)+1;continue}
@@ -86,6 +89,15 @@ const RCM_RULES=[[/legal|advocate|lawyer/i,'Legal services by an advocate'],[/fr
 const BLOCKED=/\bfood\b|\btea\b|coffee|\bmilk\b|meal|canteen|catering|refreshment|hotel|restaurant|beauty|health|medical|\bclub\b|membership|motor car|\bcar\b|vehicle|rent ?a ?cab|cab hire|\bgift|life insurance|health insurance|leave travel|personal|construction|building (repair|work)|works contract|staff welfare|party|celebration|festival/i;
 const PERSONAL=/\bpersonal\b|family|\bhouse\b|residence|\bhome\b|\bson\b|daughter|\bwife\b|husband|school fee|tuition|\blic\b|marriage|wedding|birthday|jewel|\bgold\b|\bmd\b.*(use|exp)|director'?s? (car|house|personal)|proprietor'?s?/i;
 const RECUR=/\brent\b|salary|salaries|wages|electricity|\beb\b|telephone|internet|broadband|\bamc\b|maintenance charges|lease|\bemi\b|security/i;
+/* what an expense is about, from its ledger name or its narration */
+const TOPICS={rent:/\brent\b|lease/,electricity:/electricity|\beb\b|power bill|tneb|eb bill|current bill/,telephone:/telephone|mobile|airtel|\bjio\b|vodafone|bsnl|internet|broadband|recharge|\bsim\b/,
+  freight:/freight|transport|courier|porter|lorry|cartage|parcel|logistic|shipping|loadman|coolie/,salary:/salary|salaries|wages|incentive|bonus|stipend/,repairs:/repair|maintenance|service charge|\bamc\b|plumb|electrician|carpent|painting|false ?ceiling/,
+  stationery:/stationery|printing|xerox|photocopy|cartridge|toner|\bbill book/,travel:/travel|bus fare|\bauto\b|taxi|\bcab\b|uber|\bola\b|train|flight|ticket|toll|parking/,fuel:/petrol|diesel|\bfuel\b/,
+  food:/\btea\b|coffee|\bmilk\b|snack|lunch|dinner|breakfast|bri?yani|\bfood\b|refreshment|water can|juice/,professional:/consult|professional|legal|advocate|audit fee|\bca fee/,
+  advertising:/advert|promotion|facebook|google ads|instagram|banner|flex print|pamphlet|photo ?shoot/,insurance:/insurance|premium/,bankchg:/bank charge|sms charge|annual fee|\bmdr\b/,
+  cleaning:/cleaning|housekeeping|sanitizer|phenyl|broom|detergent|pest/};
+const topicsOf=t=>{t=String(t||'').toLowerCase();return Object.keys(TOPICS).filter(k=>TOPICS[k].test(t))};
+const GENERAL=/general|misc|sundry|other exp|petty exp|office exp|day to day|daily exp/i;
 const MONS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 /* a month named in a narration that lies before the financial year of the voucher ("Mar'26" in April, "DT 17 12 2025", "FY 2025-26") */
 function earlierIn(nar,date){const fyS=(+date.slice(5,7)>=4?+date.slice(0,4):+date.slice(0,4)-1)+'-04';const t=String(nar||'').toLowerCase();let m;const hits=[];
@@ -166,6 +178,22 @@ function scrutinise(D,opt={}){
       if(RECUR.test(l)&&have.length>=3){const miss=mons.filter(m=>m>=have[0]&&m<=have[have.length-1]&&!(s.months[m]>0));if(miss.length)it.push({d:'',ledger:l,amt:0,vch:'not booked in '+miss.join(', '),note:'a monthly expense, missing in '+miss.length+' month'+(miss.length===1?'':'s')})}
       const vals=have.map(k=>s.months[k]).sort((a,b)=>a-b),med=vals[Math.floor(vals.length/2)];if(vals.length>=4&&med>=5000)for(const k of have)if(s.months[k]>med*3&&s.months[k]-med>=25000)it.push({d:k+'-01',ledger:l,amt:R2(s.months[k]-med),vch:'month '+k,note:'₹'+Math.round(s.months[k]).toLocaleString('en-IN')+' against a usual ₹'+Math.round(med).toLocaleString('en-IN')})}
     add('trend','L',`${it.length} unusual month${it.length===1?'':'s'} in expense ledgers`,'Recurring expenses are booked every month (or provided for); month-wise amounts are compared and big changes explained (SIA 6, analytical review).','Missing months understate expenses; a sudden jump may be a wrong posting or a lumped bill.','Provide for the missing months; get the reason for each jump.',it)}
+  /* 16 the right ledger: the narration says one thing, the ledger another; a specific expense in a general ledger */
+  {const it=[],gen={};for(const v of V){const N=topicsOf(v[3]);if(!N.length)continue;for(const [l,dr,a] of v[4]){if(!dr||C(l)!=='exp'||a<500)continue;const Lt=topicsOf(l);
+      if(GENERAL.test(l)&&!Lt.length){const k=l+'|'+N.join('+');const x=gen[k]=gen[k]||{d:v[0],ledger:l,amt:0,n:0,t:N.join(', '),v:[]};x.amt=R2(x.amt+a);x.n++;if(x.v.length<4)x.v.push(vref(v))}
+      else if(Lt.length&&N.length===1&&!Lt.includes(N[0])&&!Lt.includes('bankchg'))it.push({d:v[0],ledger:l,amt:a,vch:vref(v),note:'the narration is about '+N[0]+', the ledger about '+Lt.join(', ')+': '+(v[3]||'').slice(0,60)})}}
+    for(const x of Object.values(gen))if(x.amt>=2000)it.push({d:x.d,ledger:x.ledger,amt:x.amt,vch:x.n+' entries, e.g. '+x.v.join(', '),note:'specific expenses ('+x.t+') booked to a general ledger'});
+    add('wrongled','M',`${it.length} entr${it.length===1?'y':'ies'} that may be in the wrong ledger`,'Each expense is booked to the ledger of its nature, so the accounts, the tax treatment (TDS, GST credit) and the month-wise review are right (SIA 320).','Expenses misclassified; TDS or GST may be missed because the ledger hides what was bought.','Look at each and pass a rectification journal to the right ledger; keep general ledgers for small sundry items only.',it)}
+  /* 17 a ledger used the wrong way: purchases or sales straight against cash or bank (no party), expenses receiving money */
+  {const it=[];for(const v of V){const mon=v[4].some(e=>is(e[0],'cash','bank'));if(!mon)continue;
+      for(const [l,dr,a] of v[4]){if(a<1000)continue;const c=C(l);
+        if(c==='pur'&&dr&&/payment|journal|contra/i.test(v[1]))it.push({d:v[0],ledger:l,amt:a,vch:vref(v),note:'purchase booked straight against cash or bank, without the supplier\'s ledger'});
+        else if(c==='exp'&&!dr&&!/reversal|refund|return|reimburse|excess|cancel/i.test(v[3])&&!/charges|interest|commission|discount/i.test(l))it.push({d:v[0],ledger:l,amt:a,vch:vref(v),note:'money received into an expense ledger'});}}
+    add('misuse','L',`${it.length} entr${it.length===1?'y':'ies'} where a ledger is used the wrong way`,'Purchases and sales go through the party\'s ledger (so creditors, debtors and GST are right); expense ledgers record spending, not receipts.','Suppliers or customers missing from the party ledgers; income hidden as a reduction of expenses.','Book the bill to the party first and pay it from there; take receipts to an income or the party\'s ledger.',it)}
+  /* 18 the group of a ledger against its name (when the file has the ledger masters) */
+  {const it=[];if(Object.keys(D.groups||{}).length){const nm=classify({V:V,groups:{}},{}).cls;for(const [l,g] of Object.entries(D.groups)){const a=cls[l],b=nm[l];if(!st[l]||!a||!b||a===b||opt.over?.[l])continue;
+      if(['exp','tax','bank','cash','loan','fa','cap','susp','pur','sal'].includes(b)&&!(a==='party'&&b==='other'))it.push({d:'',ledger:l,amt:Math.abs(R2(st[l].dr-st[l].cr)),vch:'in the group '+g,note:'the name reads as '+CLASSES[b]+', the group makes it '+CLASSES[a]})}}
+    add('group','M',`${it.length} ledger${it.length===1?'':'s'} that may be in the wrong group`,'Each ledger sits under the group of its nature, so the balance sheet and profit and loss account show it in the right place (Schedule III).','Amounts shown under the wrong head; ratios and tax computation misstated.','Check each ledger\'s group in Tally (Alter the ledger) and correct it.',it)}
   const ledgers=Object.entries(st).map(([l,s])=>({l,c:C(l),n:s.n,dr:s.dr,cr:s.cr,net:R2(s.dr-s.cr),g:D.groups[l]||''})).sort((a,b)=>Math.abs(b.net)-Math.abs(a.net));
   const flagged={};for(const f of F)for(const x of f.items)for(const l of String(x.ledger).split('; '))flagged[l]=(flagged[l]||0)+1;for(const x of ledgers)x.flags=flagged[x.l]||0;
   return{F,ledgers,cls,CLASSES,from:D.from,to:D.to,vouchers:V.length}}
