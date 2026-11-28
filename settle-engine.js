@@ -74,8 +74,29 @@ const netAl=al=>{if(al.length<2)return al;const m=new Map();for(const [n,ty,a,dr
 const NONTRADE=/expense|charges|\bloan\b|\brent\b|salary|salaries|wages|\btea\b|coffee|\bmilk\b|travel|telephone|\bmobile\b|internet|electricity|\beb\b|freight|transport|labour|insurance|stationery|printing|meeting|carpent|\bporter\b|repair|maintenance|\bstaff\b|conveyance|postage|courier|fuel|petrol|diesel|\bsim\b|refreshment|donation|advertis|professional fees|audit fees|\bemi\b|depreciation|capital|drawings/i,
   /* names that are never a supplier or customer, even when used as the party of an expense bill (a "GST ITC" voucher) */
   NONTRADE_ALWAYS=/\bexpenses?\b|charges\b|\bloan\b|\brent\b|salar|wages|\bstaff\b|insurance|\bemi\b|depreciation|drawings|capital a\/?c|\bcapital\b/i;
+/* ---------- opening balances: Tally ledger masters (Display › List of Accounts › Export, with opening balances) ----------
+   Each party's opening bills and advances as on the first day of the year, bill by bill (BILLALLOCATIONS of the ledger master).
+   Tally writes debits as negative amounts. Owner, 28 Nov 2026: advances paid in Jan / Feb 2026 for bills of the new year. */
+function parseOpening(text){const L={};const re=/<LEDGER NAME="([^"]*)"[\s\S]*?<\/LEDGER>/g;let m;
+  while((m=re.exec(text))){const b=m[0],name=dec(m[1]),parent=xtag(b,'PARENT'),open=num(xtag(b,'OPENINGBALANCE'));const bills=[];
+    for(const x of b.match(/<BILLALLOCATIONS\.LIST>[\s\S]*?<\/BILLALLOCATIONS\.LIST>/g)||[]){const amt=num(xtag(x,'OPENINGBALANCE'));if(!amt)continue;
+      bills.push({ref:xtag(x,'NAME'),d:day(xtag(x,'BILLDATE')),amt:R2(-amt),adv:/<ISADVANCE>Yes</i.test(x)})}   /* amt: + debit, − credit */
+    if(open||bills.length)L[name]={parent,open:R2(-open),bills}}
+  return{L,n:Object.keys(L).length}}
+/* the opening bills as entries dated on their own bill date, so they are matched and aged like the year's own bills */
+function openingPostings(O,D,day0){const P=[],SUP=/creditor|payable|supplier/i,CUS=/debtor|receivable|customer/i;
+  const role={};for(const p of D.P){const r=role[p[4]]=role[p[4]]||{s:0,p:0};if(p[1]==='s'||p[1]==='cn'||p[1]==='r')r.s++;if(p[1]==='p'||p[1]==='dn'||p[1]==='y')r.p++}
+  let i=0;for(const [name,o] of Object.entries(O.L||{})){
+    const r=role[name]||{s:0,p:0},sup=SUP.test(o.parent)||(!CUS.test(o.parent)&&(r.p>r.s||(!r.s&&!r.p&&o.open<0)));
+    if(!SUP.test(o.parent)&&!CUS.test(o.parent)&&!r.s&&!r.p)continue;   // not a customer or supplier
+    const items=o.bills.length?o.bills.map(b=>({...b})):[];const left=R2(o.open-items.reduce((t,b)=>t+b.amt,0));if(Math.abs(left)>1)items.push({ref:'',d:'',amt:left,adv:false,acc:1});
+    for(const b of items){const dr=b.amt>0,a=Math.abs(b.amt),bill=sup?!dr:dr,k=sup?(bill?'p':'y'):(bill?'s':'r');
+      P.push([b.d&&b.d<day0?b.d:prevDay(day0),k,'Opening balance',b.ref||'',name,dr?1:0,a,[[b.ref||'',b.acc?'O':bill?'N':(b.adv?'V':'N'),a,dr?1:0,0]],b.acc?'opening balance, not bill-wise':'opening '+(bill?'bill':'advance')+' as on '+day0,b.ref||'',-(++i),'']);}}
+  return P}
+const prevDay=d=>{const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()-1);return x.toISOString().slice(0,10)};
 function calc(D,side,opt={}){
   const tol=1,credit=+opt.days||(side==='S'?30:45);
+  if(opt.open&&opt.open.L){const OP=openingPostings(opt.open,D,D.from||'2026-04-01');if(OP.length)D={...D,P:[...OP,...D.P]}}
   /* the ageing date: the day the work is done, or the end of the month chosen. Entries dated after it (future-dated payments
      entered ahead in Tally, later bills) have not happened yet on that day: they are left out of the matching and counted */
   const asOf=/^\d{4}-\d{2}-\d{2}$/.test(opt.asOf||'')?opt.asOf:'';let after={n:0,amt:0,to:''};
@@ -97,7 +118,9 @@ function calc(D,side,opt={}){
       for(const [ref,ty,amt,dr0] of pieces){const dr=p[7].length?dr0:p[5],isBill=dr===billDr,cr=core(ref);
         const base={d:p[0],t:p[1],kind:KIND[p[1]]||p[1],vt:p[2],vno:p[3],party:name,ref,ty,amt,nar:p[8],vref:p[9],oth:p[11]||''};
         if(isBill){
-          if(ty==='A'&&src[cr]&&!byCore[cr]?.length){const s=src[cr],take=Math.min(amt,s.rem);s.rem=R2(s.rem-take);const bl={...base,cores:[cr],rem:R2(amt-take),by:take?[{d:s.d,kind:s.kind,vt:s.vt,vno:s.vno,amt:take,how:'adv',ty:s.ty}]:[],how:take?'adv':null,refd:take};B.push(bl);byCore[cr]=[bl];continue}
+          if(ty==='A'&&src[cr]?.length&&!byCore[cr]?.length){/* the bill an advance was paid for (each advance and later payment under its name, oldest first) */
+            const bl={...base,cores:[cr],rem:amt,by:[],how:null,refd:0};for(const s of src[cr]){if(bl.rem<=tol)break;const take=R2(Math.min(bl.rem,s.rem));if(take<=0)continue;s.rem=R2(s.rem-take);bl.rem=R2(bl.rem-take);bl.refd=R2(bl.refd+take);bl.by.push({d:s.d,kind:s.kind,vt:s.vt,vno:s.vno,amt:take,how:'adv',ty:s.ty})}
+            if(bl.by.length)bl.how='adv';B.push(bl);byCore[cr]=[bl];continue}
           if(ty==='A'&&byCore[cr]?.length&&(p[1]==='s'||p[1]==='p')){/* a new invoice booked against an older bill's reference: its own bill, flagged; Tally lumps them */
             const bl={...base,rem:amt,by:[],how:null,refd:0,cores:[cr],misref:byCore[cr][0].vno};B.push(bl);byCore[cr].push(bl);continue}
           if(ty==='A'&&byCore[cr]?.length){/* a debit against an existing bill (a bounced cheque, an extra charge): the bill is re-opened, as in Tally */
@@ -112,9 +135,9 @@ function calc(D,side,opt={}){
           if(ty==='A'){const LB=byCore[cr];
             if(LB&&LB.length){let left=amt;for(const bl of LB){if(left<=0)break;const take=Math.min(left,bl.rem);if(take<=0)continue;bl.rem=R2(bl.rem-take);bl.refd=R2(bl.refd+take);bl.by.push({d:p[0],kind:base.kind,vt:p[2],vno:p[3],amt:R2(take),how:'ref',ty:'A'});left=R2(left-take)}
               if(left>tol){const bl=LB[LB.length-1];over.push({...base,bill:bl,excess:R2(left)});U.push({...base,amt:R2(left),rem:R2(left),x:'over'})}}
-            else if(src[cr])src[cr].rem=R2(src[cr].rem+amt);
+            else if(src[cr]){const u={...base,rem:amt};U.push(u);src[cr].push(u)}
             else{opening.push(base);(preA[cr]=preA[cr]||[]).push(base)}}
-          else{const u={...base,rem:amt};U.push(u);if(ty==='V'||ty==='N')src[cr]=u}}}}
+          else{const u={...base,rem:amt};U.push(u);if(ty==='V'||ty==='N')(src[cr]=src[cr]||[]).push(u)}}}}
     for(const b of B)if(b.how===null&&b.rem<=tol){b.how=b.refd?'ref':'round';b.rem=0}
     for(const b of B)b.t0=b.rem;for(const u of U){u.t0=u.rem;allU.push(u)}
     const open=()=>B.filter(b=>b.rem>tol).sort((a,b)=>a.d<b.d?-1:1),free=()=>U.filter(u=>u.rem>tol).sort((a,b)=>a.d<b.d?-1:1);
@@ -153,5 +176,5 @@ function calc(D,side,opt={}){
   const to=D.to,ageOf=b=>dd(to,b.d),late=[];
   for(const b of bills){b.days=b.rem<=tol&&b.by.length?Math.max(0,dd(b.by[b.by.length-1].d,b.d)):null;b.cr=b.cp||credit;if(b.days!=null&&b.days>b.cr)late.push(b)}
   return{side,credit,bills,pool,allU,opening,over,mis,late,elsewhere,both:both,to,from:D.from,parties:Object.keys(parties).length,ageOf,tie,asOf:asOf||to,after,nonTrade:Object.values(nonTrade).sort((a,b)=>Math.abs(b.dr-b.cr)-Math.abs(a.dr-a.cr))}}
-const API={parse,build,calc,core,nameKey,nn,R2,NONTRADE};
+const API={parse,build,calc,core,nameKey,nn,R2,NONTRADE,parseOpening,openingPostings};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.SETTLE=API})(typeof window!=='undefined'?window:globalThis);

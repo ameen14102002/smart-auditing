@@ -17,7 +17,7 @@ async function settleImport(c,file,text){
   const d=pOpen(c);
   /* the same Day Book also gives the debtors, creditors and bank ledgers (Debtors, Creditors, BRS) when no books were imported there */
   let led=d.led&&!d.led.fromSettle?d.led:null;if(!led){try{const L=ledgersFromBooks(parseLedgerEntries(text));if(Object.keys(L.dr).length||Object.keys(L.cr).length||Object.keys(L.banks).length)led={file:file.name,at:new Date().toISOString(),...L}}catch(e){}}
-  await savep({...d,...(led?{led}:{}),settle:{file:file.name,at:new Date().toISOString(),from:D.from,to:D.to,P:D.P.slice(0,80000),X:D.X.slice(0,20000),stats:D.stats,opt:d.settle?.opt||{},v:2}});
+  await savep({...d,...(led?{led}:{}),settle:{file:file.name,at:new Date().toISOString(),from:D.from,to:D.to,P:D.P.slice(0,80000),X:D.X.slice(0,20000),stats:D.stats,opt:d.settle?.opt||{},O:d.settle?.O||null,v:2}});
   _stMemo={};return D.P}
 let _stMemo={};
 /* the ageing date (owner, 28 Nov 2026): the day the work is done, or the end of the month chosen; never a date after today, so
@@ -36,8 +36,8 @@ function stAuditMonth(){const a=ST_AUDIT||(typeof A==='function'?A():null),t=Str
 function stAsOf(d){const o=d?.settle?.opt||{},today=stToday();let v=o.asOn||stAuditMonth()||'today';
   const x=/^\d{4}-\d{2}$/.test(v)?stMonthEnd(v):/^\d{4}-\d{2}-\d{2}$/.test(v)?v:today;return x>today?today:x}
 function settleCalc(d,side,asOf){
-  const S0=d.settle;if(!S0?.P?.length)return null;asOf=asOf||stAsOf(d);const key=S0.at+side+asOf+JSON.stringify(S0.opt||{});if(_stMemo[key])return _stMemo[key];
-  const r=SETTLE.calc({P:S0.P,X:S0.X||[],from:S0.from,to:S0.to},side,{days:+(S0.opt?.[side+'days'])||0,asOf});
+  const S0=d.settle;if(!S0?.P?.length)return null;asOf=asOf||stAsOf(d);const key=S0.at+side+asOf+JSON.stringify(S0.opt||{})+(S0.O?.at||'');if(_stMemo[key])return _stMemo[key];
+  const r=SETTLE.calc({P:S0.P,X:S0.X||[],from:S0.from,to:S0.to},side,{days:+(S0.opt?.[side+'days'])||0,asOf,open:S0.O||null});
   if(Object.keys(_stMemo).length>6)_stMemo={};_stMemo[key]=r;return r}
 const pl=(n,one,many)=>n+' '+(n===1?one:many);
 const HOW={ref:['g','Closed by bill reference'],adv:['g','Closed against advance (bill reference)'],round:['g','Rounding (₹1 or less)'],
@@ -105,7 +105,8 @@ function stFlags(r){
 /* ---------- screen ---------- */
 function settleTab(c,d){
   const S0=d.settle,side=ui.stSide||'S',W=side==='S'?{bills:'Sales bills',st:'Receipts',st1:'receipt',p:'Customer'}:{bills:'Purchase bills',st:'Payments',st1:'payment',p:'Supplier'};
-  const drop=`<label class="drop" data-drop="settle" style="margin-bottom:12px">${ic('up')}<b>Tally Day Book XML with bill-wise details</b><span class="small">${S0?'Now: '+esc(S0.file)+' · '+fmtD(S0.from)+' to '+fmtD(S0.to)+' · '+S0.P.length.toLocaleString('en-IN')+' party entries. Upload again to refresh.':'Gateway of Tally › Display More Reports › Day Book › period › Export as XML (with bill-wise details). The books import on the Programme tab fills this too.'}</span><input type="file" data-file="settle" accept=".xml" hidden></label>`;
+  const drop=`<label class="drop" data-drop="settle" style="margin-bottom:12px">${ic('up')}<b>Tally Day Book XML with bill-wise details</b><span class="small">${S0?'Now: '+esc(S0.file)+' · '+fmtD(S0.from)+' to '+fmtD(S0.to)+' · '+S0.P.length.toLocaleString('en-IN')+' party entries. Upload again to refresh.':'Gateway of Tally › Display More Reports › Day Book › period › Export as XML (with bill-wise details). The books import on the Programme tab fills this too.'}</span><input type="file" data-file="settle" accept=".xml" hidden></label>
+   ${S0?`<label class="drop" data-drop="stopen" style="margin-bottom:12px;padding:12px">${ic('up')}<b>Opening balances: Tally ledger masters XML</b><span class="small">${S0.O?'Now: '+esc(S0.O.file)+' · opening bills and advances of '+S0.O.n+' ledgers as on '+fmtD(S0.from)+'. Upload again to refresh.':'The Day Book starts on '+fmtD(S0.from)+': bills and advances of last year are not in it. Tally: Display More Reports › List of Accounts › Export, XML, with opening balances (bill-wise). Last year\'s advances are then set against this year\'s bills, and last year\'s bills are aged.'}</span><input type="file" data-file="stopen" accept=".xml" hidden></label>`:''}`;
   if(!S0)return drop+`<div class="empty">No Tally file yet. Each sale is matched to its receipts and each purchase to its payments: first by bill reference, then by party and amount, then on account, oldest bill first.</div>`;
   const r=settleCalc(d,side),months=[...new Set(r.bills.map(b=>b.d.slice(0,7)))].sort(),mk=months.includes(ui.stM)?ui.stM:'',s=stSummary(r,mk),HW=side==='S'?HOW:HOWP;
   const f=ui.stF||'all',party=ui.stP||'',L=(f==='un'?[]:s.B.filter(b=>f==='all'||(f==='t1'&&tierOf(b.how)===1)||(f==='t2'&&tierOf(b.how)===2)||(f==='t3'&&tierOf(b.how)===3)||(f==='open'&&b.rem>1)||(f==='nr'&&b.t0-b.rem>1))).filter(b=>!party||b.party===party);
@@ -181,6 +182,10 @@ const _procTabS=procTab;procTab=function(a,c){if(ui.ptab!=='settle')return _proc
   return `<div class="row" style="gap:6px;margin-bottom:6px">${prog.map(x=>pill(x)).join('')}</div>${more.length?`<details ${more.includes(k)?'open':''} style="margin-bottom:12px"><summary class="small muted" style="cursor:pointer">More procedures</summary><div class="row" style="gap:6px;margin-top:6px">${more.map(x=>pill(x,1)).join('')}</div></details>`:''}
    <div class="row" style="margin:4px 0 12px"><h2 class="sp" style="margin:0;font-size:18px">${esc(PR[k].n)}</h2><span class="tag n">${esc(PR[k].ref)}</span></div><p class="small muted" style="margin:-6px 0 12px">${esc(PR[k].why)} Kept for ${esc(c.name)}, FY ${esc(fyNow())}.</p><div style="margin:-6px 0 10px">${reviewBox(a,'proc:'+k,PR[k].n)}</div>${settleTab(c,d)}`};
 const _procFilesS=procFiles;procFiles=async function(c,kind,files,i){
+  if(kind==='stopen'){const f=files[0];try{toast('Reading '+f.name+'…');const text=decodeBuf(await f.arrayBuffer()),O=SETTLE.parseOpening(text);if(!O.n)throw new Error('No ledger masters with opening balances were found. In Tally: Display More Reports › List of Accounts › Export as XML, with opening balances.');
+      const d=pOpen(c);if(!d.settle)throw new Error('Import the Day Book first.');await savep({...d,settle:{...d.settle,O:{file:f.name,at:new Date().toISOString(),n:O.n,L:O.L}}});_stMemo={};await pEv(c,f,'Tally ledger masters (opening balances)');
+      if(typeof lsImport==='function'&&pOpen(c).ls)try{await lsImport(c,f,text)}catch(e){}
+      toast('Opening balances of '+O.n+' ledgers read; last year\'s bills and advances are now in the matching')}catch(e){toast(e.message||String(e))}render();return}
   if(kind==='settle'){const f=files[0];try{toast('Reading '+f.name+'…');const P=await settleImport(c,f,decodeBuf(await f.arrayBuffer()));await pEv(c,f,'Tally Day Book (bill-wise)');toast(P.length.toLocaleString('en-IN')+' party entries read; sales and purchases matched')}catch(e){toast(e.message||String(e))}render();return}
   return _procFilesS(c,kind,files,i)};
 const _importBooksS=importBooksOnce;importBooksOnce=async function(c,file){await _importBooksS(c,file);if(extOf(file.name)==='xml'){try{await settleImport(c,file,decodeBuf(await file.arrayBuffer()))}catch(e){}render()}};

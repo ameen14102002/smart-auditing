@@ -24,3 +24,5 @@ The links between the two apps:
 Ledger scrutiny (28 Nov 2026): audit type `ls` and procedure `ls` (ledger-engine.js pure engine, ledger.js screen and hooks);
 the vouchers sit in their own collection `lsdata`; tests run up to the audit's ageing date (stAsOf). Law references follow the
 Income-tax Act, 2025 from 1 Apr 2026 (TDS s.393; rates and limits unchanged), with the old 1961 sections named alongside.
+Opening balances (28 Nov 2026): Sales vs receipts takes Tally ledger masters XML (opening bills / advances, BILLALLOCATIONS with
+OPENINGBALANCE; Tally writes debits negative) as `settle.O`; settle-engine `openingPostings` adds them as entries on their bill dates.

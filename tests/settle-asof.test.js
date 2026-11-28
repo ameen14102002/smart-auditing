@@ -40,3 +40,15 @@ test('payments made before the bill under its reference settle it when it comes 
   assert.equal(r.opening.length, 0);
   assert.equal(r.tie[0].diff, 0);
 });
+test('advances of last year from the ledger masters settle this year\'s bill (owner: Icube paid in Jan / Feb 2026)', () => {
+  const X = '<LEDGER NAME="Icube"><PARENT>Sundry Creditors</PARENT><OPENINGBALANCE>-150000.00</OPENINGBALANCE>' +
+    '<BILLALLOCATIONS.LIST><BILLDATE>20260120</BILLDATE><NAME>SO0052</NAME><ISADVANCE>Yes</ISADVANCE><OPENINGBALANCE>-150000.00</OPENINGBALANCE></BILLALLOCATIONS.LIST></LEDGER>';
+  const O = S.parseOpening(X);
+  assert.equal(O.L.Icube.bills[0].amt, 150000);
+  const P2 = [['2026-06-05', 'p', 'GST ITC', 'ITC/55', 'Icube', 0, 224672, [['SO0052', 'A', 224672, 0, 0]], '', '', 2, 'Software'],
+    ['2026-06-21', 'y', 'ITC Payment', '', 'Icube', 1, 100000, [['SO0052', 'A', 100000, 1, 0]], '', '', 3, 'HDFC Bank']];
+  const r = S.calc({ P: P2, X: [], from: '2026-04-01', to: '2026-10-31' }, 'P', { asOf: '2026-10-31', open: O });
+  const b = r.bills.find(x => x.vt !== 'Opening balance');
+  assert.equal(b.rem, 0);
+  assert.equal(Math.round(r.pool.reduce((t, u) => t + u.rem, 0)), 25328);   // paid 2,50,000 against 2,24,672
+});
