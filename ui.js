@@ -450,7 +450,7 @@ async function handleFiles(kind,files,i){
   if(kind==='vouch')return importVouchers(c,files[0]);
   if(kind==='rcbooks')return rcBooks(c,files[0]);
   if(kind==='rcportal')return rcPortalFiles(c,[...files]);
-  if(kind==='rctds')return rcTdsFile(c,files[0]);
+  if(kind==='rctds'){for(const f of [...files])await rcTdsFile(c,f);return}
   if(kind==='vev'){const {d,type,t:T}=curV(),ix=+i,x=T.sample[ix];const ids=await uploadFiles(files,{clientId:c.id,purpose:`Vouching: ${VSHORT[type]} ${x.vno||''}`});const cur=S.vouching.find(v=>v.id===d.id)||d,ct=cur.types[type];return saveT(cur,type,{...ct,sample:ct.sample.map((y,k)=>k===ix?{...y,ev:[...(y.ev||[]),...ids]}:y)})}
   if(kind==='roadmap'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no rows under the header.');const items=parseRoadmap(rows),R=c.roadmap||{fy:fyNow(),items:[]};await saveRoadmap(c,{...R,items:[...R.items,...items],uploadedAt:today(),uploadFile:f.name});toast(items.length+' roadmap items added from '+f.name)}catch(er){toast(er.message)}return}
   if(kind==='ledger'){const f=files[0];try{const rows=await readSheet(f);if(rows.length<2)throw new Error('The file has no data rows.');const T=runTests(rows,f.name);let evId='';try{evId=(await uploadFiles([f],{clientId:a.clientId,auditId:a.id,purpose:'Ledger used for data tests'}))[0]||''}catch(er){}const cur=S.audits.find(x=>x.id===a.id)||a;await put('audits',a.id,{...cur,tests:{...T,evidenceId:evId},stage:cur.stage==='Planned'?'Fieldwork':cur.stage});toast(T.rows+' rows tested')}catch(er){toast(er.message)}}

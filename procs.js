@@ -149,8 +149,8 @@ function brsTab(c,d){
   if(!cur)return h+`<div class="empty">Import the books on the Programme tab: bank ledgers are found by themselves. Or add a bank account and upload its ledger.</div>`;
   const r=brsCalc(cur,d),src=cur.book?'uploaded ledger '+esc(cur.book.file):d.led?.banks?.[cur.ledger]?'books imported ('+esc(d.led.file)+'), ledger '+esc(cur.ledger):'none yet';
   h+=`<div class="grid2 even" style="margin-bottom:14px"><div>
-   <label class="drop" data-drop="brsbank" style="margin-bottom:10px">${ic('up')}<b>Bank statement: PDF, Excel or CSV</b><span class="small">${cur.bank?esc(cur.bank.file)+' · '+cur.bank.rows.length+' rows':'Date, narration, cheque / ref, withdrawal, deposit, balance. A net-banking PDF is read too (even one with a password). Include the next month\'s statement to trace items cleared later.'}</span><input type="file" data-file="brsbank" accept=".pdf,.csv,.xlsx,.xls" hidden></label>
-   <label class="drop" data-drop="brsbook">${ic('up')}<b>Bank book</b><span class="small">Now: ${src}. To use another, upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).</span><input type="file" data-file="brsbook" accept=".pdf,.csv,.xlsx,.xls" hidden></label></div>
+   <label class="drop" data-drop="brsbank" style="margin-bottom:10px">${ic('up')}<b>Bank statement: PDF, Excel or CSV</b><span class="small">${stmtNote(cur.bank,'Date, narration, cheque / ref, withdrawal, deposit, balance. A net-banking PDF is read too (even one with a password). Include the next month\'s statement to trace items cleared later.','brsClrBank')}</span><input type="file" data-file="brsbank" accept=".pdf,.csv,.xlsx,.xls" multiple hidden></label>
+   <label class="drop" data-drop="brsbook">${ic('up')}<b>Bank book</b><span class="small">Now: ${src}. To use another, upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).</span><input type="file" data-file="brsbook" accept=".pdf,.csv,.xlsx,.xls" multiple hidden></label></div>
    <div class="panel"><h3>${esc(cur.name)}</h3><div class="form">
     <label class="f">Name<input data-brs="name" value="${esc(cur.name)}"></label>
     <label class="f">As on date<input type="date" data-brs="asOf" value="${esc(cur.asOf||r.asOf||'')}"></label>
@@ -233,8 +233,8 @@ const partyAdd=s=>`<form class="row small" data-padd="${s}" style="margin-top:10
 function partyDetail(c,d,s,name,r){
   const p=r.p,S_=SIDE[s],cf=p.conf||{},rc=r.rec;
   let h=`<div class="row" style="margin-bottom:8px"><a href="#" data-act="pOpen" data-s="${s}" data-v="">← All ${S_.n.toLowerCase()}</a></div>
-  <div class="grid2 even"><div><label class="drop" data-drop="pstmt" data-i="${esc(name)}" style="margin-bottom:10px">${ic('up')}<b>${esc(name)}: their statement of account</b><span class="small">${p.stmt?esc(p.stmt.file)+' · '+p.stmt.rows.length+' entries':'PDF, Excel or CSV with Date, Particulars / Ref, Debit, Credit (opening balance row is read too).'}</span><input type="file" data-file="pstmt" data-i="${esc(name)}" accept=".pdf,.csv,.xlsx,.xls" hidden></label>
-   <label class="drop" data-drop="pbook" data-i="${esc(name)}">${ic('up')}<b>Our ledger of ${esc(name)}</b><span class="small">${p.book?'Uploaded: '+esc(p.book.file):d.led?.[s]?.[name]?'From the books imported ('+r.R.length+' entries)':'Upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).'}</span><input type="file" data-file="pbook" data-i="${esc(name)}" accept=".pdf,.csv,.xlsx,.xls" hidden></label></div>
+  <div class="grid2 even"><div><label class="drop" data-drop="pstmt" data-i="${esc(name)}" style="margin-bottom:10px">${ic('up')}<b>${esc(name)}: their statement of account</b><span class="small">${stmtNote(p.stmt,'PDF, Excel or CSV with Date, Particulars / Ref, Debit, Credit (opening balance row is read too).','pClrStmt',name)}</span><input type="file" data-file="pstmt" data-i="${esc(name)}" accept=".pdf,.csv,.xlsx,.xls" multiple hidden></label>
+   <label class="drop" data-drop="pbook" data-i="${esc(name)}">${ic('up')}<b>Our ledger of ${esc(name)}</b><span class="small">${p.book?'Uploaded: '+esc(p.book.file):d.led?.[s]?.[name]?'From the books imported ('+r.R.length+' entries)':'Upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).'}</span><input type="file" data-file="pbook" data-i="${esc(name)}" accept=".pdf,.csv,.xlsx,.xls" multiple hidden></label></div>
    <div class="panel"><h3>Balance and confirmation</h3><div class="form">
     <label class="f">Opening balance in our books (₹, ${s==='dr'?'receivable':'payable'} +)<input type="number" step="0.01" data-pp="open" data-n="${esc(name)}" data-s="${s}" value="${p.open??''}"></label>
     <label class="f">Balance as per books (₹)<input type="number" step="0.01" data-pp="bookBal" data-n="${esc(name)}" data-s="${s}" value="${p.bookBal??''}" placeholder="worked out: ${r.bal}"></label>
@@ -441,6 +441,8 @@ Object.assign(ACT,{
   naEdit:t=>{ui.naEdit=t.dataset.v;render()},naCancel:()=>{ui.naEdit=null;render()},
   naUndo:t=>{const a=A(),na={...(a.na||{})};delete na[t.dataset.v];put('audits',a.id,{...a,na})},
   brsA:t=>{ui.brsA=t.dataset.v;render()},
+  brsClrBank:()=>{const d=pd(),ac=curBrs(d);if(!ac?.bank)return;ac.bank=null;savep(d);toast('Bank statement removed. Upload it again.')},
+  pClrStmt:t=>{const d=pd(),n=t.dataset.i;for(const s of ['cr','dr']){const p=d.party[s].P[n];if(p?.stmt){p.stmt=null;savep(d);return toast('Statement of '+n+' removed.')}}},
   brsAdd:t=>{const d=pd(),n=t.dataset.v||('Bank account '+(d.brs.accts.length+1)),id=nid();d.brs.accts.push({id,name:n,ledger:t.dataset.v||'',asOf:'',bank:null,book:null,bookBal:null,openBal:null,bankBal:null,win:45});ui.brsA=id;savep(d)},
   brsDel:()=>{const d=pd(),ac=curBrs(d);if(ui.armed!=='brs'){ui.armed='brs';toast('Click again to remove '+ac.name);return}ui.armed=null;d.brs.accts=d.brs.accts.filter(a=>a!==ac);ui.brsA=null;savep(d)},
   brsCsv:()=>{const d=pd(),ac=curBrs(d),r=brsCalc(ac,d),L=[['Bank reconciliation',ac.name,'as on',r.asOf],[],['Balance as per bank statement','',r.bankBal],['Add: deposits not credited','',r.sA],['Less: cheques not presented','',r.sB],['Less: credited by bank, not in books','',r.sC],['Add: debited by bank, not in books','',r.sD],['Balance as per books (reconciled)','',r.calc],['Balance as per books','',r.bookBal],['Difference','',r.diff],[],['Item','Date','Voucher / narration','Ref','Amount','Cleared / booked later']];
@@ -496,15 +498,25 @@ document.addEventListener('submit',e=>{const f=e.target;
   if(f.dataset.naform){e.preventDefault();const r=String(new FormData(f).get('r')||'').trim();if(!r)return;const a=A();ui.naEdit=null;put('audits',a.id,{...a,na:{...(a.na||{}),[f.dataset.naform]:r}})}
 },true);
 /* file uploads of the procedures */
+/* statements of several months, in one go or one after another: each file is added to what is there; entries already read
+   (a month uploaded twice, or two files that overlap) are taken once. Owner, 28 Nov 2026 */
+const stmtNote=(o,empty,clr,i)=>o?.rows?.length?`${o.files?.length>1?o.files.length+' files':esc(o.file)} · ${o.rows.length.toLocaleString('en-IN')} entries · ${fmtD(o.rows[0].d)} to ${fmtD(o.rows[o.rows.length-1].d)} · drop more months here to add them · <a href="#" data-act="${clr}"${i!=null?` data-i="${esc(i)}"`:''}>Remove</a>`:empty+' Several files (months) at once are fine.';
+const STMT_MULTI=['brsbank','brsbook','pstmt','pbook'];
+function stmtAdd(old,add){const key=x=>[x.d,x.dr||0,x.cr||0,String(x.ref||'').trim(),String(x.nar||x.p||'').slice(0,40)].join('|'),have={};
+  for(const x of old||[]){const k=key(x);have[k]=(have[k]||0)+1}const seen={},out=[...(old||[])];let n=0;
+  for(const x of add){const k=key(x);seen[k]=(seen[k]||0)+1;if(seen[k]>(have[k]||0)){out.push(x);n++}}
+  return{rows:out.map((x,j)=>[x,j]).sort((a,b)=>a[0].d.localeCompare(b[0].d)||a[1]-b[1]).map(a=>a[0]),added:n,dup:add.length-n}}
+const stmtFiles=(o,name,n)=>{const F=[...(o?.files||(o?.file?[{name:o.file,n:o.rows?.length||0}]:[])).filter(x=>x.name!==name),{name,n}];return{file:F.map(x=>x.name).join(', '),files:F}};
 async function procFiles(c,kind,files,i){
+  if(STMT_MULTI.includes(kind)&&files.length>1){for(const f of [...files])await procFiles(c,kind,[f],i);return}
   const f=files[0];try{
     if(kind==='books')return importBooksOnce(c,f);
     const d=pOpen(c),rows=extOf(f.name)==='xml'?null:await readSheet(f);
     if(kind==='brsbank'||kind==='brsbook'){let ac=curBrs(d);if(!ac){ac={id:nid(),name:'Bank account 1',ledger:'',asOf:'',bank:null,book:null,bookBal:null,openBal:null,bankBal:null,win:45};d.brs.accts.push(ac);ui.brsA=ac.id}
-      if(kind==='brsbank'){const R=parseBankStmt(rows);ac.bank={file:f.name,rows:R.slice(0,40000)};toast(R.length+' bank entries read')}else{const R=parseLedgerTable(rows);ac.book={file:f.name,rows:R.slice(0,40000)};toast(R.length+' bank book entries read')}
+      const k=kind==='brsbank'?'bank':'book',R=kind==='brsbank'?parseBankStmt(rows):parseLedgerTable(rows),m=stmtAdd(ac[k]?.rows,R);ac[k]={...stmtFiles(ac[k],f.name,R.length),rows:m.rows.slice(0,60000)};toast(f.name+': '+m.added+' entries added'+(m.dup?', '+m.dup+' already there':'')+' · '+m.rows.length+' in all ('+fmtD(m.rows[0]?.d)+' to '+fmtD(m.rows[m.rows.length-1]?.d)+')')
       await savep(d);await pEv(c,f,kind==='brsbank'?'Bank statement: '+ac.name:'Bank book: '+ac.name);return}
     if(kind==='pstmt'||kind==='pbook'){const s=ui.party?.cr===i?'cr':ui.party?.dr===i?'dr':(d.party.cr.P[i]||d.led?.cr?.[i]?'cr':'dr'),P=d.party[s].P,p=P[i]=P[i]||{};
-      if(kind==='pstmt'){const r=parsePartyStmt(rows);p.stmt={file:f.name,rows:r.rows,open:r.open||null};toast(r.rows.length+' entries read from '+i+'\'s statement')}else{const R=parseLedgerTable(rows);p.book={file:f.name,rows:R};toast(R.length+' ledger entries read')}
+      if(kind==='pstmt'){const r=parsePartyStmt(rows),m=stmtAdd(p.stmt?.rows,r.rows),first=!p.stmt||r.rows[0]?.d<(p.stmt.rows[0]?.d||'9');p.stmt={...stmtFiles(p.stmt,f.name,r.rows.length),rows:m.rows,open:first?(r.open||null):(p.stmt.open||null)};toast(f.name+': '+m.added+' entries added'+(m.dup?', '+m.dup+' already there':'')+' · '+m.rows.length+' in '+i+'\'s statement')}else{const R=parseLedgerTable(rows),m=stmtAdd(p.book?.rows,R);p.book={...stmtFiles(p.book,f.name,R.length),rows:m.rows};toast(f.name+': '+m.added+' ledger entries added · '+m.rows.length+' in all')}
       await savep(d);await pEv(c,f,(kind==='pstmt'?'Statement of account: ':'Ledger: ')+i);return}
     if(kind==='stock'){const R=parseStockList(rows);d.stock={file:f.name,items:R,set:{keyPct:5,n:25,seed:1},sample:[],cnt:{}};await savep(d);await pEv(c,f,'Book stock list');return toast(R.length+' stock items read. Draw the sample next.')}
     if(kind==='far'){const R=parseFAR(rows);d.fav={file:f.name,items:R,set:{keyPct:5,n:25,seed:1},sample:[],res:{},extra:[]};await savep(d);await pEv(c,f,'Fixed asset register');return toast(R.length+' assets read. Draw the sample next.')}
