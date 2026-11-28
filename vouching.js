@@ -14,6 +14,31 @@ const CF={'80':1.61,'90':2.31,'95':3.0};
 const VMETHOD={method:'standard',conf:'90',tolPct:5,riskPicks:2};
 const METHODS={standard:'Standard: key items + value-weighted (MUS) + risk picks',mus:'Monetary unit sampling (MUS) + key items',stratified:'Stratified by value band (high / medium / low)',random:'Simple random',systematic:'Systematic (every nth voucher by date)'};
 const VPOP={};
+/* every voucher of the population is kept with the import (compact), so each line of the population analysis opens to its
+   vouchers after a reload too, and can be exported or vouched */
+const VROWMAX=60000,r2v=x=>Math.round((+x||0)*100)/100;
+const VROW=r=>[r.date||'',r.vtype||'',r.vno||'',r.ref||'',r.party||'',r.gstin||'',r.pos||'',r2v(r.taxable),r2v(r.cgst),r2v(r.sgst),r2v(r.igst),r2v(r.amount),r.taxType||'nongst',r.reg?1:0,r.ledger||''];
+const VUN=a=>({date:a[0],vtype:a[1],vno:a[2],ref:a[3],party:a[4],gstin:a[5],pos:a[6],taxable:a[7],cgst:a[8],sgst:a[9],igst:a[10],amount:a[11],taxType:a[12],reg:!!a[13],ledger:a[14]});
+function popRows(d,type){const m=VPOP[d?.id]?.[type];if(m)return m;const L=d?.types?.[type]?.rows;if(!L?.length)return null;const r=L.map(VUN);VPOP[d.id]={...(VPOP[d.id]||{}),[type]:r};return r}
+/* the groups of the population analysis: the same tests as the counts shown */
+function vGroups(A){const sun=r=>{const d=new Date(r.date+'T00:00:00');return!isNaN(d)&&d.getDay()===0};return{
+  high:[`High value (≥ ${inrc(A.keyAmt)})`,r=>r.amount>=A.keyAmt],medium:[`Medium value (≥ ${inrc(A.medianCut)})`,r=>r.amount>=A.medianCut&&r.amount<A.keyAmt],low:['Low value',r=>r.amount<A.medianCut&&r.amount<A.keyAmt],
+  local:['Local (CGST + SGST)',r=>r.taxType==='local'],interstate:['Interstate (IGST)',r=>r.taxType==='interstate'],nongst:['Non-GST / exempt',r=>r.taxType==='nongst'],
+  unreg:['Party without GSTIN',r=>!r.reg],round:['Round sums (₹10,000 or more, whole thousands)',r=>r.amount>=10000&&r.amount%1000===0],sunday:['Dated on a Sunday',sun],all:['Every voucher',()=>true]}}
+function vFilter(A,key){if(!key)return null;if(key.startsWith('party:')){const n=key.slice(6);return['Party: '+n,r=>(r.party||'(no party)')===n]}if(key.startsWith('month:')){const m=key.slice(6);return['Month: '+m,r=>String(r.date).slice(0,7)===m]}return vGroups(A)[key]||null}
+const VHEAD=['Date','Voucher type','Voucher no.','Supplier / customer invoice no.','Party','GSTIN','Place of supply','Taxable value','CGST','SGST','IGST','Total','Tax type','Registered','Ledger'];
+const vLine=r=>[r.date,r.vtype,r.vno,r.ref,r.party,r.gstin,r.pos,r.taxable,r.cgst,r.sgst,r.igst,r.amount,TT[r.taxType]||r.taxType,r.reg?'Yes':'No',r.ledger];
+function vDetail(c,d,type,A){const key=ui.vpop?.type===type?ui.vpop.k:'';const F=vFilter(A,key);if(!F)return'';const rows=popRows(d,type);
+  if(!rows)return`<div class="panel" style="margin-top:14px"><b>${esc(F[0])}</b><p class="small muted">The vouchers of this import were not kept (imported before this was added). Import the file again to see and export them.</p></div>`;
+  const L=rows.filter(F[1]).sort((a,b)=>String(a.date).localeCompare(String(b.date))||b.amount-a.amount),tot=k=>L.reduce((t,r)=>t+(+r[k]||0),0),shown=ui.vpopAll?L:L.slice(0,300);
+  const inS=new Set((d.types[type].sample||[]).map(x=>x.vno+'|'+x.date+'|'+x.amount));
+  return`<div class="panel" id="vpop-detail" style="margin-top:14px"><div class="row" style="gap:10px;align-items:center"><h2 class="sp" style="margin:0">${esc(VSHORT[type])}: ${esc(F[0])}</h2>
+    <button class="btn ghost sm" data-act="vPopX">${ic('down')}Excel</button><button class="btn ghost sm" data-act="vPopVouch" title="Add these vouchers to the vouching sheet below">${ic('edit')}Vouch these</button><button class="btn ghost sm" data-act="vPop" data-v="">Close</button></div>
+   <p class="small muted" style="margin:6px 0 8px">${L.length.toLocaleString('en-IN')} voucher${L.length===1?'':'s'} · taxable ${inr(Math.round(tot('taxable')))} · CGST ${inr(Math.round(tot('cgst')))} · SGST ${inr(Math.round(tot('sgst')))} · IGST ${inr(Math.round(tot('igst')))} · total <b>${inr(Math.round(tot('amount')))}</b>${d.types[type].cut?` · the import kept the first ${VROWMAX.toLocaleString('en-IN')} of ${d.types[type].cut.toLocaleString('en-IN')} vouchers`:''}</p>
+   <div class="scroll" style="max-height:520px"><table><thead><tr><th>Date</th><th>Voucher</th><th>Invoice no.</th><th>Party</th><th>GSTIN</th><th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Total</th><th>Tax type</th></tr></thead><tbody>
+   ${shown.map(r=>`<tr><td>${fmtD(r.date)}</td><td>${esc(r.vtype)} ${esc(r.vno||'')}${inS.has(r.vno+'|'+r.date+'|'+r.amount)?' <span class="tag g">in sample</span>':''}</td><td>${esc(r.ref||'')}</td><td>${esc(r.party||'')}</td><td>${esc(r.gstin||'')}${r.reg?'':' <span class="tag y">none</span>'}</td><td class="num">${inr(r.taxable)}</td><td class="num">${r.cgst?inr(r.cgst):''}</td><td class="num">${r.sgst?inr(r.sgst):''}</td><td class="num">${r.igst?inr(r.igst):''}</td><td class="num"><b>${inr(r.amount)}</b></td><td>${esc(TT[r.taxType]||'')}</td></tr>`).join('')}
+   </tbody></table></div>${L.length>shown.length?`<button class="btn ghost sm" style="margin-top:8px" data-act="vPopAll">Show all ${L.length.toLocaleString('en-IN')}</button>`:''}</div>`}
+const vRowBtn=(key,html)=>`<tr data-act="vPop" data-v="${esc(key)}" style="cursor:pointer" title="Show these vouchers">${html}</tr>`;
 const vdocId=(c,fy)=>c.id+'-'+String(fy).replace(/[^0-9]/g,'');
 const vdoc=c=>S.vouching.find(v=>v.id===vdocId(c,fyNow()));
 
@@ -143,7 +168,7 @@ function vResults(t){
 const inrc=n=>{n=+n||0;return n>=1e7?'₹'+(n/1e7).toFixed(2)+' cr':n>=1e5?'₹'+(n/1e5).toFixed(2)+' L':inr(Math.round(n))};
 const TT={local:'Local (CGST + SGST)',interstate:'Interstate (IGST)',nongst:'Non-GST / exempt'};
 function vouchingTab(c){
-  const doc=vdoc(c),types=doc?Object.keys(VTYPES).filter(k=>doc.types?.[k]):[],cur=types.includes(ui.vtype)?ui.vtype:types[0],pop=VPOP[vdocId(c,fyNow())];
+  const doc=vdoc(c),types=doc?Object.keys(VTYPES).filter(k=>doc.types?.[k]):[],cur=types.includes(ui.vtype)?ui.vtype:types[0],pop=doc?Object.fromEntries(Object.keys(doc.types||{}).map(k=>[k,popRows(doc,k)])):null;
   const imp=`<div class="grid2 even" style="margin-bottom:16px"><label class="drop" data-drop="vouch">${ic('up')}<b>Import vouchers: Tally XML, CSV or Excel</b><span class="small">Tally: Day Book → Export → XML (any encoding). Other software: a voucher / GST register with date, voucher type, number, party, GSTIN, taxable value, CGST, SGST, IGST and total.</span><input type="file" data-file="vouch" accept=".xml,.csv,.xlsx,.xls" hidden></label>
    <div class="panel"><h3>Import settings</h3><div class="form"><label class="f">File contains<select id="vk"><option value="auto">Auto-detect from voucher type</option>${Object.entries(VTYPES).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('')}</select></label><label class="f">Client's GSTIN (for local vs interstate)<input id="vg" value="${esc(c.gstin||'')}" placeholder="e.g. 33AAACK1234F1Z5"></label></div>
    <p class="small muted" style="margin:8px 0 0">The imported file is kept as client evidence (hosted version: up to 25 MB). FY ${esc(fyNow())}.</p></div></div>`;
@@ -152,12 +177,13 @@ function vouchingTab(c){
   return imp+`<div class="tabs" role="tablist" style="margin-top:0">${types.map(k=>{const r=vResults(doc.types[k]);return `<button class="${k===cur?'on':''}" data-act="vtype" data-v="${k}">${VSHORT[k]}<span class="n">${doc.types[k].summary.N}</span>${r.total?`<span class="n" style="${r.done===r.total?'color:var(--ok)':''}">${r.done}/${r.total}</span>`:''}</button>`}).join('')}</div>
   <div class="kpis"><div class="kpi"><b>${A.N}</b><span>${esc(VSHORT[cur])} vouchers</span></div><div class="kpi"><b>${inrc(A.V)}</b><span>Total value</span></div><div class="kpi"><b>${pct(A.tax.interstate.n,A.N)}%</b><span>Interstate by count</span></div><div class="kpi ${A.unreg.n?'':'good'}"><b>${A.unreg.n}</b><span>Unregistered party vouchers</span></div><div class="kpi"><b>${R.total?R.done+'/'+R.total:'—'}</b><span>Sample vouched</span></div></div>
   <div class="grid2 even"><div class="panel"><h2>Population analysis</h2><p class="small muted" style="margin-top:-4px">${fmtD(A.from)} to ${fmtD(A.to)} · ${A.partyCount} parties · source ${esc(doc.source?.file||'')}${pop?.[cur]?'':' · re-import to redraw the sample'}</p>
-   <div class="scroll"><table><thead><tr><th>Value band</th><th class="num">Vouchers</th><th class="num">Value</th><th class="num">Share</th></tr></thead><tbody>${[['high',`High (≥ ${inrc(A.keyAmt)})`],['medium',`Medium (≥ ${inrc(A.medianCut)})`],['low','Low']].map(([k,l])=>`<tr><td>${l}</td><td class="num">${A.bands[k].n}</td><td class="num">${inrc(A.bands[k].v)}</td><td class="num">${pct(A.bands[k].v,A.V)}%</td></tr>`).join('')}
-   ${Object.entries(TT).map(([k,l],i)=>`<tr>${i===0?'':''}<td>${l}</td><td class="num">${A.tax[k].n}</td><td class="num">${inrc(A.tax[k].v)}</td><td class="num">${pct(A.tax[k].v,A.V)}%</td></tr>`).join('')}
-   <tr><td>Party without GSTIN</td><td class="num">${A.unreg.n}</td><td class="num">${inrc(A.unreg.v)}</td><td class="num">${pct(A.unreg.v,A.V)}%</td></tr></tbody></table></div>
-   <p class="small" style="margin:10px 0 4px"><b>Tax in the vouchers:</b> CGST ${inrc(A.gst.cgst)} · SGST ${inrc(A.gst.sgst)} · IGST ${inrc(A.gst.igst)} · Round sums ${A.round} · Sunday-dated ${A.sunday}</p>
-   <h3 style="margin-top:12px">Top parties</h3>${A.parties.map(p=>`<div class="bar"><span>${esc(p.party)}</span><div class="track"><span style="width:${Math.round(p.share*100)}%;background:var(--acc)"></span></div><span class="num">${Math.round(p.share*100)}%</span></div>`).join('')}
-   <h3 style="margin-top:12px">By month</h3>${(()=>{const mx=Math.max(1,...A.months.map(x=>x[1]));return A.months.map(([k,v])=>`<div class="bar"><span>${esc(k)}</span><div class="track"><span style="width:${v/mx*100}%;background:var(--lo)"></span></div><span class="num" style="min-width:5em">${inrc(v)}</span></div>`).join('')})()}</div>
+   <div class="scroll"><table><thead><tr><th>Value band</th><th class="num">Vouchers</th><th class="num">Value</th><th class="num">Share</th></tr></thead><tbody>${[['high',`High (≥ ${inrc(A.keyAmt)})`],['medium',`Medium (≥ ${inrc(A.medianCut)})`],['low','Low']].map(([k,l])=>vRowBtn(k,`<td><a href="#" onclick="return false">${l}</a></td><td class="num">${A.bands[k].n}</td><td class="num">${inrc(A.bands[k].v)}</td><td class="num">${pct(A.bands[k].v,A.V)}%</td>`)).join('')}
+   ${Object.entries(TT).map(([k,l])=>vRowBtn(k,`<td><a href="#" onclick="return false">${l}</a></td><td class="num">${A.tax[k].n}</td><td class="num">${inrc(A.tax[k].v)}</td><td class="num">${pct(A.tax[k].v,A.V)}%</td>`)).join('')}
+   ${vRowBtn('unreg',`<td><a href="#" onclick="return false">Party without GSTIN</a></td><td class="num">${A.unreg.n}</td><td class="num">${inrc(A.unreg.v)}</td><td class="num">${pct(A.unreg.v,A.V)}%</td>`)}</tbody></table></div>
+   <p class="small" style="margin:10px 0 4px"><b>Tax in the vouchers:</b> CGST ${inrc(A.gst.cgst)} · SGST ${inrc(A.gst.sgst)} · IGST ${inrc(A.gst.igst)} · <a href="#" data-act="vPop" data-v="round">Round sums ${A.round}</a> · <a href="#" data-act="vPop" data-v="sunday">Sunday-dated ${A.sunday}</a> · <a href="#" data-act="vPop" data-v="all">Every voucher</a></p>
+   <p class="small muted" style="margin:0 0 4px">Click a line, a party or a month to see its vouchers, export them to Excel, or vouch them.</p>
+   <h3 style="margin-top:12px">Top parties</h3>${A.parties.map(p=>`<div class="bar" data-act="vPop" data-v="party:${esc(p.party)}" style="cursor:pointer" title="Show these vouchers"><span>${esc(p.party)}</span><div class="track"><span style="width:${Math.round(p.share*100)}%;background:var(--acc)"></span></div><span class="num">${Math.round(p.share*100)}%</span></div>`).join('')}
+   <h3 style="margin-top:12px">By month</h3>${(()=>{const mx=Math.max(1,...A.months.map(x=>x[1]));return A.months.map(([k,v])=>`<div class="bar" data-act="vPop" data-v="month:${esc(k)}" style="cursor:pointer" title="Show these vouchers"><span>${esc(k)}</span><div class="track"><span style="width:${v/mx*100}%;background:var(--lo)"></span></div><span class="num" style="min-width:5em">${inrc(v)}</span></div>`).join('')})()}</div>
   <div class="panel"><h2>Sampling plan</h2><form id="vplan" class="form"><label class="f wide">Method<select id="vm-method">${opts(METHODS,plan?.method||VMETHOD.method)}</select></label>
    <label class="f">Confidence<select id="vm-conf">${opts({'80':'80%','90':'90%','95':'95%'},String(plan?.conf||VMETHOD.conf))}</select></label><label class="f">Tolerable error (% of value)<input id="vm-tol" type="number" min="0.5" max="50" step="0.5" value="${plan?.tolPct||VMETHOD.tolPct}"></label>
    <label class="f">Sample size override<input id="vm-n" type="number" min="0" step="1" value="${plan?.override||''}" placeholder="auto"></label><label class="f">Risk picks per rule<input id="vm-risk" type="number" min="0" max="10" value="${plan?.riskPicks??VMETHOD.riskPicks}"></label>
@@ -169,6 +195,7 @@ function vouchingTab(c){
     <li>Random seed ${plan.seed}: the same data and seed always give the same sample.</li></ul></div>`:''}
    ${R.total?`<div class="card" style="margin-top:12px"><div class="row"><b class="sp">Result</b>${R.done<R.total?`<span class="tag y">${R.total-R.done} to vouch</span>`:R.ok?'<span class="tag g">Within tolerable error</span>':'<span class="tag r">Exceeds tolerable error</span>'}</div>
     <p class="small" style="margin:6px 0 0">${R.ex} exception${R.ex===1?'':'s'} · actual misstatement ${inrc(R.actual)} · projected to the population <b>${inrc(R.proj)}</b> against tolerable ${inrc(R.TM)}.</p>${R.ex?`<button class="btn ghost sm" style="margin-top:8px" data-act="vObs">${ic('flag')}Raise observation</button>`:''}</div>`:''}</div></div>
+  ${vDetail(c,doc,cur,A)}
   ${t.sample?.length?vouchSheet(c,cur,t):''}`;
 }
 function vouchSheet(c,type,t){
@@ -212,7 +239,7 @@ async function importVouchers(c,file){
     const id=vdocId(c,fyNow()),by={};rows.forEach(r=>(by[r.type]=by[r.type]||[]).push(r));
     VPOP[id]={...(VPOP[id]||{}),...by};
     const old=S.vouching.find(v=>v.id===id)||{id,clientId:c.id,fy:fyNow(),types:{}},types={...old.types};
-    for(const [k,L] of Object.entries(by)){const prev=types[k];types[k]={summary:analyse(L,prev?.plan?.tolPct||VMETHOD.tolPct),plan:prev?.plan||null,sample:prev?.sample||[]}}
+    for(const [k,L] of Object.entries(by)){const prev=types[k];types[k]={summary:analyse(L,prev?.plan?.tolPct||VMETHOD.tolPct),plan:prev?.plan||null,sample:prev?.sample||[],rows:L.slice(0,VROWMAX).map(VROW),cut:L.length>VROWMAX?L.length:0}}
     let evId='';if(file.size<=(mode==='claude'?EVID_INLINE_MAX:25*1048576)){try{evId=await addEvidence(file,{clientId:c.id,purpose:'Vouching data import'})}catch(e){}}
     await put('vouching',id,{...old,types,source:{file:file.name,rows:rows.length,at:new Date().toISOString(),evidenceId:evId,kind}});
     ui.vtype=Object.keys(VTYPES).find(k=>by[k]);
@@ -222,7 +249,18 @@ async function importVouchers(c,file){
 function curV(){const c=C(),d=vdoc(c),types=d?Object.keys(VTYPES).filter(k=>d.types?.[k]):[];const type=types.includes(ui.vtype)?ui.vtype:types[0];return{c,d,type,t:d?.types?.[type]}}
 function saveT(d,type,t){return put('vouching',d.id,{...d,types:{...d.types,[type]:t}})}
 Object.assign(ACT,{
-  vtype:t=>{ui.vtype=t.dataset.v;render()},
+  vtype:t=>{ui.vtype=t.dataset.v;ui.vpop=null;render()},
+  vPop:t=>{const {type}=curV();const k=t.dataset.v||'';ui.vpop=k?{type,k}:null;ui.vpopAll=false;render();if(k)setTimeout(()=>document.getElementById('vpop-detail')?.scrollIntoView({behavior:'smooth',block:'start'}),60)},
+  vPopAll:()=>{ui.vpopAll=true;render()},
+  vPopX:async()=>{const {c,d,type,t:T}=curV(),F=vFilter(T.summary,ui.vpop?.k),rows=popRows(d,type);if(!F||!rows)return;const L=rows.filter(F[1]).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const tot=k=>Math.round(L.reduce((t,r)=>t+(+r[k]||0),0)*100)/100;
+    await xlsxSave([[F[0].slice(0,28),[VHEAD,...L.map(vLine),[],['Total','','','','','','',tot('taxable'),tot('cgst'),tot('sgst'),tot('igst'),tot('amount')]]]],VSHORT[type]+' - '+F[0].replace(/[^\w ()+.-]+/g,' ')+' - '+c.name+' - FY '+fyNow());toast(L.length+' vouchers exported')},
+  vPopVouch:async()=>{const {d,type,t:T}=curV(),F=vFilter(T.summary,ui.vpop?.k),rows=popRows(d,type);if(!F||!rows)return;const L=rows.filter(F[1]);
+    if(L.length>500&&!confirm(L.length+' vouchers will be added to the vouching sheet. Continue?'))return;
+    const S0=T.sample||[],have=new Set(S0.map(x=>x.vno+'|'+x.date+'|'+x.amount));let n=S0.length,add=0;const why=F[0].replace(/ \(.*\)$/,'');
+    const out=S0.map(x=>{const k=x.vno+'|'+x.date+'|'+x.amount;return L.some(r=>r.vno+'|'+r.date+'|'+r.amount===k)&&!x.why.includes(why)?{...x,why:[...x.why,why]}:x});
+    for(const r of L){const k=r.vno+'|'+r.date+'|'+r.amount;if(have.has(k))continue;have.add(k);add++;out.push({sid:'v'+(n++),date:r.date,vno:r.vno,party:r.party,gstin:r.gstin,amount:r.amount,taxable:r.taxable,tax:r.cgst+r.sgst+r.igst,taxType:r.taxType,reg:r.reg,why:[why],checks:{},result:'',mis:0,note:'',ev:[]})}
+    await saveT(d,type,{...T,sample:out});toast(add?add+' voucher'+(add===1?'':'s')+' added to the vouching sheet':'These vouchers are already in the vouching sheet')},
   vres:t=>{const {d,type,t:T}=curV(),i=+t.dataset.i,v=T.sample[i].result===t.dataset.v?'':t.dataset.v;saveT(d,type,{...T,sample:T.sample.map((x,k)=>k===i?{...x,result:v,mis:v==='ok'?0:x.mis}:x)})},
   vCsv:()=>{const {c,type,t:T}=curV(),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"',ch=VCHECKS[type]||VCHECKS.journal;dlFile(fileSafe(c.name)+' vouching '+VSHORT[type]+' FY '+fyNow()+'.csv',[['#','Date','Voucher','Party','GSTIN','Amount','Tax type','Selected because',...ch,'Result','Misstatement','Note'].map(q).join(','),...T.sample.map((x,i)=>[i+1,x.date,x.vno,x.party,x.gstin,x.amount,TT[x.taxType],x.why.join('; '),...ch.map((_,k)=>x.checks[k]?'Yes':''),{ok:'OK',ex:'Exception',nf:'Not found'}[x.result]||'',x.mis||'',x.note].map(q).join(','))].join('\n'))},
   vObs:()=>{const {c,type,t:T}=curV(),r=vResults(T),ex=T.sample.filter(x=>x.result==='ex'||x.result==='nf');newObs({clientId:c.id,auditId:A()?.id||'',title:`Exceptions in vouching of ${VSHORT[type].toLowerCase()}`,rating:r.ok?'M':'H',condition:`${ex.length} of ${T.sample.length} sampled ${VSHORT[type].toLowerCase()} vouchers had exceptions (actual misstatement ${inr(Math.round(r.actual))}; projected ${inr(Math.round(r.proj))} against tolerable ${inr(Math.round(r.TM))}). `+ex.slice(0,4).map(x=>`${x.vno} ${x.party} ${inr(x.amount)}${x.note?' – '+x.note:''}`).join('; ')+'.',criteria:(VCHECKS[type]||[]).join('; '),evidence:ex.flatMap(x=>x.ev||[])})}
@@ -236,7 +274,7 @@ document.addEventListener('change',e=>{
 });
 document.addEventListener('submit',e=>{
   if(e.target.id!=='vplan')return;e.preventDefault();e.stopImmediatePropagation();
-  const {c,d,type,t:T}=curV(),rows=VPOP[d.id]?.[type];if(!rows)return toast('Re-import the data file to draw a new sample.');
+  const {c,d,type,t:T}=curV(),rows=popRows(d,type);if(!rows)return toast('Re-import the data file to draw a new sample.');
   const m={method:val('vm-method'),conf:val('vm-conf'),tolPct:+val('vm-tol')||VMETHOD.tolPct,riskPicks:+val('vm-risk')||0,n:+val('vm-n')||0,override:+val('vm-n')||'',seed:Math.floor(Math.random()*1e9)};
   const {plan,sample}=drawSample(rows,type,m);
   saveT(d,type,{...T,summary:analyse(rows,m.tolPct),plan,sample});toast(`${sample.length} vouchers sampled`);
