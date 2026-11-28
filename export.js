@@ -21,7 +21,11 @@ function procSheets(a,c,k){
   if(k==='settle'){const d=pOpen(c);return d.settle?[...stSheets(d,'S'),...stSheets(d,'P')]:[]}
   const keep={ptab:ui.ptab,stAll:ui.stAll,stAllP:ui.stAllP,stAllA:ui.stAllA,party:ui.party};ui.ptab=k;ui.stAll=ui.stAllP=ui.stAllA=true;ui.party={};
   let html='';try{html=procTab(a,c)}finally{Object.assign(ui,keep)}
-  return tablesToSheets(html,XSHORT[k]||PR[k]?.n||k).map(([n,r])=>[n.replace(/ – (Debtors|Creditors): balances, ageing and confirmations/,' – balances & ageing').replace(/, FY \d{4}-\d{2}/,''),r])}
+  const L=tablesToSheets(html,XSHORT[k]||PR[k]?.n||k).map(([n,r])=>[n.replace(/ – (Debtors|Creditors): balances, ageing and confirmations/,' – balances & ageing').replace(/, FY \d{4}-\d{2}/,''),r]);
+  /* debtors / creditors: the real ageing and the ageing as per Tally, actual and negative parties bill-wise, from the Day Book */
+  if((k==='crs'||k==='drs')&&typeof stSheets==='function'){const d=pOpen(c);if(d.settle?.P?.length){const W=k==='crs'?'Creditors':'Debtors';
+    for(const [n,r] of stSheets(d,k==='crs'?'P':'S'))if(/real ageing|as per tally|bill-wise/i.test(n))L.push([n.replace(/^(Sales|Purchases) real ageing/,W+' real ageing').replace(/^(Sales|Purchases) ageing as per Tally/,W+' ageing as per Tally'),r])}}
+  return L}
 /* write the workbook */
 const sheetName=(n,used)=>{let b=String(n).replace(/[\\/?*[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,31)||'Sheet',x=b,i=2;while(used.has(x.toLowerCase()))x=b.slice(0,28)+' '+i++;used.add(x.toLowerCase());return x};
 async function xlsxSave(sheets,name){

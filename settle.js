@@ -143,6 +143,7 @@ Object.assign(ACT,{
   stSide:t=>{ui.stSide=t.dataset.v;ui.stF='all';ui.stP='';ui.stAll=false;render()},
   stF:t=>{ui.stF=t.dataset.v;ui.stAll=false;render()},
   stAll:()=>{ui.stAll=true;render()},stAge:t=>{ui.stAge=t.dataset.v;render()},stAllA:()=>{ui.stAllA=true;render()},stAllP:()=>{ui.stAllP=true;render()},
+  goAgeing:t=>{ui.ptab='settle';ui.stSide=t.dataset.v;ui.stF='all';ui.stP='';render();setTimeout(()=>{const h=[...document.querySelectorAll('h2')].find(x=>/Ageing as on/.test(x.textContent));h&&h.scrollIntoView({behavior:'smooth',block:'start'})},80)},
   stX:t=>{ui.stX=ui.stX===t.dataset.v?'':t.dataset.v;render()},
   stSign:t=>{ui.stSign=t.dataset.v;ui.stAllA=false;render()},
   stParty:t=>{ui.stP=t.dataset.v;ui.stF='all';render();document.querySelector('.kpis')?.scrollIntoView({behavior:'smooth',block:'start'})},
@@ -203,4 +204,5 @@ const _partyCalcS=partyCalc;partyCalc=function(d,s,name){const x=_partyCalcS(d,s
   const own=d.party[s].P[name]||{},byBills=!(+own.open)&&!(own.bookBal!=null&&own.bookBal!=='')&&!own.book?.rows;
   return{...x,...(byBills?{bal:R2(p.net),book:R2(p.net),fromBills:1}:{}),age:p.age.map(v=>R2(Math.max(0,v))),adv:R2(p.adv+p.acc),billwise:p,over45:R2(r.bills.filter(b=>b.party===name&&b.rem>1&&dayDiff(x.asOf,b.d)>45).reduce((t,b)=>t+b.rem,0))}};
 const _partyTabS=partyTab;partyTab=function(c,d,s){const h=_partyTabS(c,d,s);if(!d.settle?.P?.length)return h;
-  return h.replace(/Ageing is worked out first-in, first-out from the [^<]*in the books\./,'Ageing is from the bill-wise matching of the Tally file: against the bill first, then by party and amount, then on account. Advances and on-account amounts not adjusted are shown under the party name.')};
+  const W=s==='cr'?['creditors','Purchases vs payments']:['debtors','Sales vs receipts'],link=`<div class="panel" style="margin-bottom:12px"><div class="row" style="gap:10px"><span class="sp small"><b>Real ageing and ageing as per Tally</b>, with actual and negative ${W[0]} bill by bill, from the Day Book (as on ${fmtD(stAsOf(d))}). Also in this procedure's Excel.</span><button class="btn ghost sm" data-act="goAgeing" data-v="${s==='cr'?'P':'S'}">Open the ageing</button></div></div>`;
+  return link+h.replace(/Ageing is worked out first-in, first-out from the [^<]*in the books\./,'Ageing is from the bill-wise matching of the Tally file: against the bill first, then by party and amount, then on account. Advances and on-account amounts not adjusted are shown under the party name.')};
