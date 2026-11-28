@@ -38,6 +38,9 @@ function stAsOf(d){const o=d?.settle?.opt||{},today=stToday();let v=o.asOn||stAu
 function settleCalc(d,side,asOf){
   const S0=d.settle;if(!S0?.P?.length)return null;asOf=asOf||stAsOf(d);const key=S0.at+side+asOf+JSON.stringify(S0.opt||{})+(S0.O?.at||'');if(_stMemo[key])return _stMemo[key];
   const r=SETTLE.calc({P:S0.P,X:S0.X||[],from:S0.from,to:S0.to},side,{days:+(S0.opt?.[side+'days'])||0,asOf,open:S0.O||null});
+  /* the audit's year: a Day Book that starts earlier (to bring in last year's bills and advances) is used for the matching,
+     but the counts and findings are for this year's entries; last year's bills still open stay in the ageing */
+  {const y=+asOf.slice(0,4)-(+asOf.slice(5,7)<4?1:0),pS=y+'-04-01';if(r.from<pS){r.pStart=pS;r.late=r.late.filter(b=>b.d>=pS);r.over=r.over.filter(o=>o.d>=pS);r.mis=r.mis.filter(m=>m.u.d>=pS);if(r.elsewhere)r.elsewhere=r.elsewhere.filter(x=>x.d>=pS);r.opening=r.opening.filter(o=>o.d>=pS);r.bf=r.bills.filter(b=>b.d<pS&&b.rem>1)}}
   if(Object.keys(_stMemo).length>6)_stMemo={};_stMemo[key]=r;return r}
 const pl=(n,one,many)=>n+' '+(n===1?one:many);
 const HOW={ref:['g','Closed by bill reference'],adv:['g','Closed against advance (bill reference)'],round:['g','Rounding (₹1 or less)'],
@@ -66,8 +69,8 @@ function stBillwise(r,name,mode){const T=mode==='tally',asOf=r.asOf||r.to,L=[],i
 const tierOf=h=>h==='ref'||h==='adv'||h==='round'?1:h==='fifo'||h==='reffifo'?3:h==='part'||h==='open'||!h?0:2;
 const bucket=n=>n<=30?'0–30':n<=60?'31–60':n<=90?'61–90':n<=180?'91–180':'Over 180';
 function stSummary(r,mk){
-  const inM=x=>!mk||x.d.slice(0,7)===mk,B=r.bills.filter(inM),sum=L=>R2(L.reduce((s,b)=>s+b.amt,0)),sumR=L=>R2(L.reduce((s,b)=>s+b.rem,0));
-  const t1=B.filter(b=>tierOf(b.how)===1),t2=B.filter(b=>tierOf(b.how)===2),t3=B.filter(b=>tierOf(b.how)===3),op=B.filter(b=>b.rem>1),pl=r.pool.filter(inM);
+  const inM=x=>!mk||x.d.slice(0,7)===mk,inY=x=>!r.pStart||x.d>=r.pStart,B=r.bills.filter(b=>inM(b)&&inY(b)),sum=L=>R2(L.reduce((s,b)=>s+b.amt,0)),sumR=L=>R2(L.reduce((s,b)=>s+b.rem,0));
+  const t1=B.filter(b=>tierOf(b.how)===1),t2=B.filter(b=>tierOf(b.how)===2),t3=B.filter(b=>tierOf(b.how)===3),op=r.bills.filter(b=>inM(b)&&b.rem>1),pl=r.pool.filter(inM);
   return{B,t1,t2,t3,op,pl,sum,sumR,notRef:B.filter(b=>tierOf(b.how)!==1&&b.how!=='open'),settled:B.filter(b=>b.how!=='open')}}
 
 /* ---------- findings that become observations ---------- */
@@ -86,7 +89,7 @@ function stFlags(r){
   if(r.late.length)F.push({k:'late',r:'M',t:S?`${pl(r.late.length,'sales bill','sales bills')} collected after the credit period`:`${pl(r.late.length,'purchase bill','purchase bills')} paid after the credit period`,c:`Average ${Math.round(r.late.reduce((s,b)=>s+b.days,0)/r.late.length)} days against ${r.credit} days allowed. Slowest: `+r.late.slice().sort((a,b)=>b.days-a.days).slice(0,8).map(b=>`${b.party} ${b.ref||b.vno} (${b.days} days)`).join(', '),
     cr:S?'Collections within agreed credit terms.':'Payments within agreed terms; MSME suppliers within 45 days.',e:S?'Working capital blocked; credit risk.':'Interest to MSME suppliers; tax disallowance under s.43B(h).',rec:S?'Review credit limits and follow-up for the slow customers.':'Identify MSME suppliers among these and pay within 45 days.'});
   if(r.opening.length)F.push({k:'open',r:'L',t:`${pl(r.opening.length,W.st,W.sts)} against bills from before this file (${inr(r.opening.reduce((s,x)=>s+x.amt,0))})`,c:'Settle opening bills; agree them to last year\'s outstanding list: '+r.opening.slice(0,10).map(x=>`${x.party} ${x.ref}`).join(', '),cr:'Opening balances agree with the previous year\'s closing outstanding.',e:'Opening outstanding could be misstated.',rec:'Import a file from the start of the year, or check these against the opening bill list.'});
-  const mr=r.bills.filter(b=>b.misref);if(mr.length)F.push({k:'misref',r:'M',t:`${pl(mr.length,W.b+' invoice',W.b+' invoices')} booked against another bill's number in Tally (${inr(R2(mr.reduce((t,b)=>t+b.amt,0)))})`,
+  const mr=r.bills.filter(b=>b.misref&&(!r.pStart||b.d>=r.pStart));if(mr.length)F.push({k:'misref',r:'M',t:`${pl(mr.length,W.b+' invoice',W.b+' invoices')} booked against another bill's number in Tally (${inr(R2(mr.reduce((t,b)=>t+b.amt,0)))})`,
     c:mr.slice(0,10).map(b=>`${b.party}: ${b.kind} ${b.vno} of ${fmtD(b.d)} (${inr(b.amt)}) was entered "Agst Ref ${b.ref}", the number of ${b.kind.toLowerCase()} ${b.misref}`).join('; '),
     cr:'Each invoice is entered in Tally as a new bill (New Ref) under its own number.',e:'Tally adds the new invoice to the old bill: its outstanding and ageing by bill are wrong, and the old bill looks unpaid for longer.',rec:'Correct the bill-wise details of these invoices to New Ref with their own numbers.'});
   if(r.elsewhere?.length)F.push({k:'else',r:'M',t:`${pl(r.elsewhere.length,S?'receipt':'payment',W.sts)} booked to another ledger, but the narration names a ${W.p}`,

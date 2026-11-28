@@ -53,7 +53,7 @@ function procFacts(a,c,k){
 function flagAmt(r,f){const S=x=>R2(x.reduce((t,v)=>t+v,0));switch(f.k){
   case'noref':return S(r.bills.map(b=>Math.max(0,b.t0-b.rem)));case'over':return S(r.over.map(o=>o.excess));case'mis':return S(r.mis.map(m=>m.u.rem));
   case'after':return R2(r.after?.amt||0);case'tdsfull':return R2(r.pool.filter(u=>u.rem>1&&/\btds\b/i.test((u.oth||'')+' '+(u.vno||'')+' '+(u.nar||''))).reduce((t,u)=>t+u.rem,0));case'nontrade':return null;
-  case'adv':return S(r.pool.filter(u=>r.ageOf(u)>90).map(u=>u.rem));case'old':return S(r.bills.filter(b=>b.rem>1&&r.ageOf(b)>180).map(b=>b.rem));case'misref':return S(r.bills.filter(b=>b.misref).map(b=>b.amt));
+  case'adv':return S(r.pool.filter(u=>r.ageOf(u)>90).map(u=>u.rem));case'old':return S(r.bills.filter(b=>b.rem>1&&r.ageOf(b)>180).map(b=>b.rem));case'misref':return S(r.bills.filter(b=>b.misref&&(!r.pStart||b.d>=r.pStart)).map(b=>b.amt));
   case'else':return S((r.elsewhere||[]).map(x=>x.amt));case'near':return S(r.bills.filter(b=>b.diff).map(b=>Math.abs(b.diff)));case'open':return S(r.opening.map(o=>o.amt));default:return null}}
 const sameT=(f,o)=>f===o||String(f).replace(/^(Sales|Purchases): /,'')===o;
 const obsOfProc=(a,k,O)=>O.filter(o=>o.auditId===a.id&&(o.proc===k||(k==='chk'&&o.item!=null&&!o.proc)));
@@ -195,10 +195,10 @@ function procSheet(p,SUM){const {a,c,k,f,obs,ev}=p,x=new RS(p.sheet);x.tab=p.ton
   x.section('Auditor\'s conclusion');
   x.table([{h:'Conclusion',at:'C',k:'b'},{h:'Status',at:'D',k:'c'},{h:'Notes',at:'E'}],[[{ok:'Satisfactory',issue:'Needs action'}[f.conc.st]||'Not concluded yet',chip({ok:'Done',issue:'Action'}[f.conc.st]||'Open',f.conc.st==='ok'?'okC':f.conc.st==='issue'?'badC':'warnC'),f.conc.text||'']]);
   return x.out()}
-function settleBlock(x,e){const {W,AG,s}=e;
+function settleBlock(x,e){const {W,AG,s,r}=e;
   x.section(W[0]+' vs '+W[2]+': what is really outstanding');
   x.table([{h:'Measure',at:'C',k:'b'},{h:'Amount (₹)',at:'D',k:'n'},{h:'What it means',at:'E'}],[
-    [W[0]+' bills',{v:s.B.length,s:'tdC'},'Bills in the period.'],['Billed',Math.round(s.sum(s.B)),'Total of those bills.'],
+    [W[0]+' bills',{v:s.B.length,s:'tdC'},r.pStart?'Bills from '+fmtD(r.pStart)+' to '+fmtD(r.asOf||r.to)+'. Earlier entries in the file are used only to match payments and advances.':'Bills in the period.'],...(r.bf?.length?[['Earlier years\' bills still open',Math.round(r.bf.reduce((t,b)=>t+b.rem,0)),r.bf.length+' bills dated before '+fmtD(r.pStart)+'; they are in the ageing and the amount below.']]:[]),['Billed',Math.round(s.sum(s.B)),'Total of those bills.'],
     ['Pending as per Tally',Math.round(e.tally),'What Tally\'s bill-wise report shows as pending.'],
     ['Not a real outstanding',{v:Math.round(e.notReal),s:'n0'},`The ${W[2]} came in but were booked on account or without the bill. Only a correction in Tally is needed.`],
     ['Really '+W[3],{v:Math.round(e.real),s:'n0B'},`What is truly still ${W[3]}.`],[W[2][0].toUpperCase()+W[2].slice(1)+' not matched to any bill',Math.round(e.un),'Advances or excess amounts.']]);
