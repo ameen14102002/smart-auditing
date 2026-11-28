@@ -26,3 +26,7 @@ the vouchers sit in their own collection `lsdata`; tests run up to the audit's a
 Income-tax Act, 2025 from 1 Apr 2026 (TDS s.393; rates and limits unchanged), with the old 1961 sections named alongside.
 Opening balances (28 Nov 2026): Sales vs receipts takes Tally ledger masters XML (opening bills / advances, BILLALLOCATIONS with
 OPENINGBALANCE; Tally writes debits negative) as `settle.O`; settle-engine `openingPostings` adds them as entries on their bill dates.
+Client logos (28 Nov 2026): `clogo.js`. Paste/drop an image on a client's page or master form; the app removes a plain background,
+crops, drops stray bits, sizes it and puts it on a white (or, for a light logo, dark) tile, and saves one finished version on the
+client record (`c.logo`: `img` transparent PNG for re-editing, `xl` the finished tile shown everywhere). `clogo(c,h)` draws it in the
+app; `buildReport` puts the same tile on the Excel cover and every sheet's title bar (xlsxsa.js `sh.images`).

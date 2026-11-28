@@ -121,8 +121,13 @@ RS.prototype={
     if(o.freeze)this.freeze={row:h0};return h0},
   /* label and value pairs (key figures, engagement details): no merge needed, value in its own column */
   pairs(L,cols){const at=cols||{l:'C',v:'D',x:'E'};this.table([{h:'Item',at:at.l,k:'b'},{h:'Value',at:at.x?at.x:at.v,k:'n'},...(at.x?[{h:'What it means',at:at.v}]:[])],L.map(p=>at.x?[p[0],p[1],p[2]||'']:[p[0],p[1]]))},
-  out(){return{name:this.name,rows:this.rows,w:this.w,merges:this.merges,heights:this.heights,tab:this.tab,freeze:this.freeze,filter:this.filter,foot:XS_FOOT}}};
-let XS_FOOT='';
+  out(){const o={name:this.name,rows:this.rows,w:this.w,merges:this.merges,heights:this.heights,tab:this.tab,freeze:this.freeze,filter:this.filter,foot:XS_FOOT};
+    /* the client's logo at the right end of the navy title bar (row 2), the same finished tile as in the app */
+    if(XS_LOGO&&this.rows[1]?.[1]?.s==='title'){const L=XS_LOGO,h=34,w=Math.round(h*L.w/L.h),tot=this.w.reduce((t,x)=>t+Math.trunc(x*7+5),0),y0=(this.heights[1]||16)*4/3,bar=(this.heights[2]||32)*4/3;
+      o.images=[{png:L.png,w,h,x:Math.max(0,tot-w-10),y:y0+(bar-h)/2,alt:'Client logo'}]}
+    return o}};
+let XS_FOOT='',XS_LOGO=null;
+const _logoOf=c=>typeof clogoPng==='function'?clogoPng(c):null;
 const chip=(t,s)=>({v:t,s});
 const linkTo=(sheet,text)=>({v:text,s:'link',f:`HYPERLINK("#'${sheet}'!A1","${String(text).replace(/"/g,'')}")`});
 const opinionAll=(O,procs)=>['Satisfactory','Needs improvement','Unsatisfactory'][Math.max(['Satisfactory','Needs improvement','Unsatisfactory'].indexOf(opinionOf(O)),procs.some(p=>p.tone==='bad')?2:procs.some(p=>p.tone==='warn')?1:0)];
@@ -134,6 +139,7 @@ function buildReport(audits,opt={}){
   audits=audits.filter(Boolean);const cl=[...new Set(audits.map(a=>a.clientId))].map(id=>S.clients.find(x=>x.id===id)).filter(Boolean);
   const O=obsOfReport(audits),per0=[...new Set(audits.map(a=>a.period).filter(Boolean))],sub=cl.map(c=>c.name).join(', ')+(per0.length?'  ·  '+per0.join(', '):'')+'  ·  '+fmtD(today());
   XS_FOOT=cl.map(c=>c.name).join(', ')+' · Internal audit report · '+fmtD(today());
+  const LOGO0=cl.length===1?_logoOf(cl[0]):null;XS_LOGO=LOGO0;
   const SUM='1 Summary',sheets=[],procs=[];let no=3;
   const seen=new Set();for(const a of audits){const c=S.clients.find(x=>x.id===a.clientId);if(!c)continue;for(const k of (opt.only?[opt.only]:programmeOf(a))){const key=k==='chk'?a.id+k:c.id+k;if(seen.has(key))continue;seen.add(key);
     const f=_withAudit(a,()=>procFacts(a,c,k)),obs=obsOfProc(a,k,O),ev=evOfProc(a,c,k);if(f.money==null)f.money=0;f.money+=obs.reduce((t,o)=>t+(+o.amount||0),0);procs.push({a,c,k,f,obs,ev,tone:toneFor(f,obs),sheet:(no++)+' '+shortName(k,a,audits.length>1)})}}
@@ -165,10 +171,10 @@ function buildReport(audits,opt={}){
   h.section('Words used');h.table([{h:'Word',at:'C',k:'b'},{h:'Meaning',at:'D'}],GLOSS);h.rows.forEach(r=>{if(r[3]&&r[3].s&&/^td/.test(r[3].s))r[3]={...r[3]}});
   sheets.push(h.out());
   /* procedures */
-  for(const p of procs){_withAudit(p.a,()=>{sheets.push(procSheet(p,SUM));for(const dsh of detailSheets(p,SUM))sheets.push(dsh)})}
+  for(const p of procs){XS_LOGO=_logoOf(p.c);try{_withAudit(p.a,()=>{sheets.push(procSheet(p,SUM));for(const dsh of detailSheets(p,SUM))sheets.push(dsh)})}finally{XS_LOGO=LOGO0}}
   const DOCS=docsUsed(audits,cl,procs);
   sheets.push(findingsSheet(procs,O,SUM,DOCS),obsSheetX(O,SUM,procs),discSheetX(O,audits,SUM,procs),docsSheet(DOCS,SUM),evSheetX(audits,cl,SUM));
-  sheets.unshift(coverSheet(audits,cl,sheets,procs,op));
+  sheets.unshift(coverSheet(audits,cl,sheets,procs,op));XS_LOGO=null;
   return sheets}
 
 function procSheet(p,SUM){const {a,c,k,f,obs,ev}=p,x=new RS(p.sheet);x.tab=p.tone==='bad'?'FFC93A2E':p.tone==='warn'?'FFD39B00':p.tone==='ok'?'FF17875A':'FF8A93A8';
@@ -255,4 +261,8 @@ function coverSheet(audits,cl,sheets,procs,op){const x=new RS('Cover',[2,4,28,96
   const desc=n=>n==='1 Summary'?'The opinion, every procedure at a glance, and what to fix first':n==='2 How to read'?'Colours, the layout, and the words used, for readers new to audit':n==='Findings'?'Every finding, numbered, with the money involved and what to do':n==='Observations'?'Observations reported to management, with their responses':n==='For discussion'?'Points to agree with management (yellow cells to fill)':n==='Documents used'?'Every document and data source the audit relied on':n==='Evidence annex'?'The files on record, with their integrity hash':'Procedure: '+(procs.find(p=>p.sheet===n)?.f.plain||'');
   x.table([{h:'Sheet',at:'C',k:'b'},{h:'What it contains',at:'D'}],sheets.filter(s=>!/^\d+\.\d+ /.test(s.name)).map(s=>[linkTo(s.name,s.name),desc(s.name)]));
   x.section('Sign-off');x.table([{h:'',at:'C',k:'b'},{h:'Name, signature and date',at:'D'}],[['Prepared by',{v:'',s:'in'}],['Reviewed by',{v:'',s:'in'}],['Approved by',{v:'',s:'in'}]]);
-  return x.out()}
+  const o=x.out(),px=v=>Math.trunc(v*7+5),band=[30,48,26,22,30].reduce((t,v)=>t+v,0)*4/3,right=px(2)+px(4)+px(28)+px(96);
+  /* the client's logo (or each client's, side by side) on the right of the navy band */
+  const Ls=cl.map(_logoOf).filter(Boolean).slice(0,3);let xr=right-18;o.images=[];
+  for(const L of Ls.reverse()){const h=Math.round(Math.min(Ls.length>1?84:116,(Ls.length>1?200:300)*L.h/L.w)),w=Math.round(h*L.w/L.h);xr-=w;o.images.push({png:L.png,w,h,x:xr,y:(band-h)/2,alt:'Client logo'});xr-=14}
+  return o}

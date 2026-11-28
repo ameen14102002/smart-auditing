@@ -308,3 +308,43 @@ td.grp{letter-spacing:.02em}
   .brand span:last-child{font-size:15px;white-space:nowrap}
 }
 @media print{.report img{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+
+/* ---------- client logos (clogo.js): the same finished tile everywhere ---------- */
+.clogo{--h:40px;display:inline-flex;align-items:center;flex:none;height:var(--h);max-width:calc(var(--h)*3.4);vertical-align:middle}
+.clogo img{height:100%;width:auto;max-width:100%;object-fit:contain;display:block;filter:drop-shadow(0 1px 2px rgb(16 35 71 / .12))}
+.clogo.ini{width:var(--h);justify-content:center;border-radius:calc(var(--h)*.14);font:700 calc(var(--h)*.38)/1 'IBM Plex Sans',sans-serif;letter-spacing:.02em;
+  color:hsl(var(--hue) 45% 28%);background:hsl(var(--hue) 55% 92%);border:1px solid hsl(var(--hue) 35% 82%)}
+.cwho{display:inline-flex;align-items:center;gap:8px}.cwho .clogo{--h:22px}
+.card .row>.clogo{margin-right:10px}
+.head>.clogo{align-self:center}
+.logobtn{position:relative;border:0;background:none;padding:0;cursor:pointer;align-self:center;border-radius:12px}
+.logobtn .logoedit{position:absolute;inset:auto 0 -2px 0;text-align:center;font:600 11px/1.6 'IBM Plex Sans',sans-serif;color:#fff;background:rgb(16 35 71 / .82);border-radius:0 0 10px 10px;opacity:0;transition:opacity var(--t-fast,.15s)}
+.logobtn:hover .logoedit,.logobtn:focus-visible .logoedit{opacity:1}
+.logodrop{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:1.5px dashed var(--line);border-radius:var(--r);background:var(--card);padding:12px 14px;cursor:pointer;color:inherit;font:inherit;flex-wrap:wrap}
+.logodrop b{display:block;width:100%}.logodrop:hover,.logodrop.over{border-color:var(--acc);background:var(--acc-soft)}
+.logodlg{width:min(1040px,96vw);max-height:94vh;border:0;border-radius:16px;padding:0;box-shadow:0 30px 80px -20px rgb(0 0 0 / .45);background:var(--card);color:inherit}
+.logodlg::backdrop{background:rgb(10 20 45 / .55)}
+.lg-head,.lg-foot{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line)}.lg-head h2{margin:0;flex:1;font-size:18px}
+.lg-foot{border-top:1px solid var(--line);border-bottom:0}.lg-foot .sp{flex:1}
+.lg-body{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:16px 18px;overflow:auto;max-height:calc(94vh - 130px)}
+@media (max-width:760px){.lg-body{grid-template-columns:1fr}}
+.lg-lab{font-weight:600;margin:0 0 6px}
+.lg-src{position:relative;min-height:200px;border:1.5px dashed var(--line);border-radius:12px;display:grid;place-items:center;overflow:hidden;
+  background:repeating-conic-gradient(#e9ecf3 0 25%,#fff 0 50%) 0 0/16px 16px}
+.lg-src.over{border-color:var(--acc)}
+.lg-src canvas{max-width:100%;max-height:300px;display:block;cursor:crosshair;touch-action:none}
+.lg-empty{display:grid;gap:6px;text-align:center;padding:20px;max-width:34em;background:rgb(255 255 255 / .9);border-radius:10px;color:#24304f}
+.lg-ctl{display:grid;gap:10px;margin-top:14px}.lg-ctl .f{display:grid;gap:4px}.lg-ctl input[type=range]{width:100%}
+.lg-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--acc);color:#fff}
+.lg-out{min-height:160px;border-radius:12px;display:grid;place-items:center;padding:16px;background:repeating-conic-gradient(#e9ecf3 0 25%,#fff 0 50%) 0 0/16px 16px}
+.lg-out img{max-width:100%;max-height:170px;display:block}
+.lg-prev{display:grid;grid-template-columns:1fr 1fr;gap:10px}.lg-pv{display:grid;gap:4px}
+.lg-card{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--card);min-height:60px;overflow:hidden}
+.lg-card b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-xl{display:flex;align-items:center;gap:10px;justify-content:space-between;background:#1F2A5C;color:#fff;padding:6px 10px;min-height:44px;border-radius:2px;font-family:Calibri,'IBM Plex Sans',sans-serif}
+.lg-xl.cover{background:#1F2A5C;min-height:96px;padding:10px 14px}.lg-xl.cover b{font-size:17px}.lg-xl small{display:block;color:#C4CFF0;font-size:12px}
+.lg-xl .clogo img{filter:none}
+.logodlg .banner.ok{background:color-mix(in srgb,var(--ok) 12%,var(--card))}.logodlg .banner.err{background:color-mix(in srgb,var(--hi) 14%,var(--card))}
+.logodlg [hidden]{display:none!important}
+.lg-out img{max-height:130px}
