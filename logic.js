@@ -264,7 +264,20 @@ function qFromText(s){
   const d=toDate(s);if(d&&!isNaN(d))return (d.getMonth()+9)%12;
   return null;
 }
+/* a statement, ledger or register as PDF, read as rows (pdfrows.js). A password-protected PDF asks for its password once; the
+   password opens this file only and is not kept anywhere */
+const PDF_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+async function readPdfRows(f,opt){
+  await needLib('pdfjsLib');pdfjsLib.GlobalWorkerOptions.workerSrc=PDF_WORKER;const data=new Uint8Array(await f.arrayBuffer());let doc=null,pw;
+  for(let tries=0;;tries++){try{doc=await pdfjsLib.getDocument({data:data.slice(),password:pw}).promise;break}
+    catch(e){if(e&&e.name==='PasswordException'&&tries<3){pw=prompt((tries?'That password did not open it. ':'')+f.name+' is locked with a password. Banks often use the customer ID or date of birth; Form 26AS uses the date of birth as DDMMYYYY. Type it to read the file (it is not kept):');if(pw==null)throw new Error(f.name+' needs its password to be read.');continue}
+      throw new Error('Could not read '+f.name+' as a PDF: '+(e&&e.message||e))}}
+  toast('Reading '+doc.numPages+' page'+(doc.numPages===1?'':'s')+' of '+f.name+'…');
+  const pages=await PDFROWS.pagesOf(doc);try{doc.destroy()}catch(e){}
+  if(!pages.some(p=>p.length))throw new Error(f.name+' is a scanned PDF (pictures of the pages), so it has no text to read. Ask for the statement downloaded from net banking as PDF, Excel or CSV.');
+  return PDFROWS.rowsOf(pages,opt).filter(r=>r.some(v=>String(v).trim()))}
 async function readSheet(f){
+  if(/\.pdf$/i.test(f.name))return readPdfRows(f);
   if(/\.xlsx?$/i.test(f.name)){
     await needLib('XLSX');
     const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
@@ -309,8 +322,8 @@ function runTests(rows,file){
 }
 
 /* ---------- libraries loaded on demand ---------- */
-const LIBS={XLSX:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',JSZip:'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'};
-function needLib(g){if(window[g])return Promise.resolve();return new Promise((ok,no)=>{const s=document.createElement('script');s.src=LIBS[g];s.onload=ok;s.onerror=()=>no(new Error(g==='XLSX'?'Could not load the Excel reader; save the file as CSV and try again.':'Could not load the ZIP tool; download the report on its own instead.'));document.head.appendChild(s)})}
+const LIBS={pdfjsLib:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',XLSX:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',JSZip:'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'};
+function needLib(g){if(window[g])return Promise.resolve();return new Promise((ok,no)=>{const s=document.createElement('script');s.src=LIBS[g];s.onload=ok;s.onerror=()=>no(new Error(g==='pdfjsLib'?'Could not load the PDF reader (no internet?). Try again, or use the Excel / CSV of the statement.':g==='XLSX'?'Could not load the Excel reader; save the file as CSV and try again.':'Could not load the ZIP tool; download the report on its own instead.'));document.head.appendChild(s)})}
 
 /* ---------- evidence: files attached to audits and checks ---------- */
 const EVID_INLINE_MAX=150*1024;

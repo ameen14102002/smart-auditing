@@ -149,8 +149,8 @@ function brsTab(c,d){
   if(!cur)return h+`<div class="empty">Import the books on the Programme tab: bank ledgers are found by themselves. Or add a bank account and upload its ledger.</div>`;
   const r=brsCalc(cur,d),src=cur.book?'uploaded ledger '+esc(cur.book.file):d.led?.banks?.[cur.ledger]?'books imported ('+esc(d.led.file)+'), ledger '+esc(cur.ledger):'none yet';
   h+=`<div class="grid2 even" style="margin-bottom:14px"><div>
-   <label class="drop" data-drop="brsbank" style="margin-bottom:10px">${ic('up')}<b>Bank statement: CSV or Excel</b><span class="small">${cur.bank?esc(cur.bank.file)+' · '+cur.bank.rows.length+' rows':'Date, narration, cheque / ref, withdrawal, deposit, balance. Include the next month\'s statement to trace items cleared later.'}</span><input type="file" data-file="brsbank" accept=".csv,.xlsx,.xls" hidden></label>
-   <label class="drop" data-drop="brsbook">${ic('up')}<b>Bank book</b><span class="small">Now: ${src}. To use another, upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).</span><input type="file" data-file="brsbook" accept=".csv,.xlsx,.xls" hidden></label></div>
+   <label class="drop" data-drop="brsbank" style="margin-bottom:10px">${ic('up')}<b>Bank statement: PDF, Excel or CSV</b><span class="small">${cur.bank?esc(cur.bank.file)+' · '+cur.bank.rows.length+' rows':'Date, narration, cheque / ref, withdrawal, deposit, balance. A net-banking PDF is read too (even one with a password). Include the next month\'s statement to trace items cleared later.'}</span><input type="file" data-file="brsbank" accept=".pdf,.csv,.xlsx,.xls" hidden></label>
+   <label class="drop" data-drop="brsbook">${ic('up')}<b>Bank book</b><span class="small">Now: ${src}. To use another, upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).</span><input type="file" data-file="brsbook" accept=".pdf,.csv,.xlsx,.xls" hidden></label></div>
    <div class="panel"><h3>${esc(cur.name)}</h3><div class="form">
     <label class="f">Name<input data-brs="name" value="${esc(cur.name)}"></label>
     <label class="f">As on date<input type="date" data-brs="asOf" value="${esc(cur.asOf||r.asOf||'')}"></label>
@@ -233,8 +233,8 @@ const partyAdd=s=>`<form class="row small" data-padd="${s}" style="margin-top:10
 function partyDetail(c,d,s,name,r){
   const p=r.p,S_=SIDE[s],cf=p.conf||{},rc=r.rec;
   let h=`<div class="row" style="margin-bottom:8px"><a href="#" data-act="pOpen" data-s="${s}" data-v="">← All ${S_.n.toLowerCase()}</a></div>
-  <div class="grid2 even"><div><label class="drop" data-drop="pstmt" data-i="${esc(name)}" style="margin-bottom:10px">${ic('up')}<b>${esc(name)}: their statement of account</b><span class="small">${p.stmt?esc(p.stmt.file)+' · '+p.stmt.rows.length+' entries':'CSV or Excel with Date, Particulars / Ref, Debit, Credit (opening balance row is read too).'}</span><input type="file" data-file="pstmt" data-i="${esc(name)}" accept=".csv,.xlsx,.xls" hidden></label>
-   <label class="drop" data-drop="pbook" data-i="${esc(name)}">${ic('up')}<b>Our ledger of ${esc(name)}</b><span class="small">${p.book?'Uploaded: '+esc(p.book.file):d.led?.[s]?.[name]?'From the books imported ('+r.R.length+' entries)':'Upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).'}</span><input type="file" data-file="pbook" data-i="${esc(name)}" accept=".csv,.xlsx,.xls" hidden></label></div>
+  <div class="grid2 even"><div><label class="drop" data-drop="pstmt" data-i="${esc(name)}" style="margin-bottom:10px">${ic('up')}<b>${esc(name)}: their statement of account</b><span class="small">${p.stmt?esc(p.stmt.file)+' · '+p.stmt.rows.length+' entries':'PDF, Excel or CSV with Date, Particulars / Ref, Debit, Credit (opening balance row is read too).'}</span><input type="file" data-file="pstmt" data-i="${esc(name)}" accept=".pdf,.csv,.xlsx,.xls" hidden></label>
+   <label class="drop" data-drop="pbook" data-i="${esc(name)}">${ic('up')}<b>Our ledger of ${esc(name)}</b><span class="small">${p.book?'Uploaded: '+esc(p.book.file):d.led?.[s]?.[name]?'From the books imported ('+r.R.length+' entries)':'Upload the Tally ledger (Date, Particulars, Vch type, Vch no, Debit, Credit).'}</span><input type="file" data-file="pbook" data-i="${esc(name)}" accept=".pdf,.csv,.xlsx,.xls" hidden></label></div>
    <div class="panel"><h3>Balance and confirmation</h3><div class="form">
     <label class="f">Opening balance in our books (₹, ${s==='dr'?'receivable':'payable'} +)<input type="number" step="0.01" data-pp="open" data-n="${esc(name)}" data-s="${s}" value="${p.open??''}"></label>
     <label class="f">Balance as per books (₹)<input type="number" step="0.01" data-pp="bookBal" data-n="${esc(name)}" data-s="${s}" value="${p.bookBal??''}" placeholder="worked out: ${r.bal}"></label>
@@ -290,7 +290,7 @@ function parseFAR(rows){
 function drawPick(items,set){const tot=items.reduce((t,x)=>t+Math.abs(x.v),0),key=items.filter(x=>Math.abs(x.v)>=tot*(+set.keyPct||5)/100),rest=items.filter(x=>!key.includes(x)),R=rng(+set.seed||1),pool=rest.slice(),pick=[];
   const n=Math.min(+set.n||25,pool.length);for(let i=0;i<n;i++){const j=Math.floor(R()*pool.length);pick.push(pool.splice(j,1)[0])}return{ids:[...key,...pick].map(x=>x.id),key:key.length,tot}}
 function stockTab(c,d){
-  const s=d.stock;let h=`<label class="drop" data-drop="stock" style="margin-bottom:12px">${ic('up')}<b>Book stock list: CSV or Excel</b><span class="small">${s?esc(s.file)+' · '+s.items.length+' items · '+inrc(s.items.reduce((t,x)=>t+x.v,0)):'Tally Stock Summary or an item list with Item, Quantity, Rate, Value (and location if any).'}</span><input type="file" data-file="stock" accept=".csv,.xlsx,.xls" hidden></label>`;
+  const s=d.stock;let h=`<label class="drop" data-drop="stock" style="margin-bottom:12px">${ic('up')}<b>Book stock list: PDF, Excel or CSV</b><span class="small">${s?esc(s.file)+' · '+s.items.length+' items · '+inrc(s.items.reduce((t,x)=>t+x.v,0)):'Tally Stock Summary or an item list with Item, Quantity, Rate, Value (and location if any).'}</span><input type="file" data-file="stock" accept=".pdf,.csv,.xlsx,.xls" hidden></label>`;
   if(!s)return h+concBox(d,'stock');
   h+=sampleBar('stock',s,'Count every item worth at least');
   if(!s.sample?.length)return h+concBox(d,'stock');
@@ -302,7 +302,7 @@ function stockTab(c,d){
   return h+concBox(d,'stock')}
 const FARES={found:['g','Seen, in use'],idle:['y','Seen, not in use'],damaged:['y','Seen, damaged'],notag:['y','Seen, not tagged'],missing:['r','Not found']};
 function favTab(c,d){
-  const s=d.fav;let h=`<label class="drop" data-drop="far" style="margin-bottom:12px">${ic('up')}<b>Fixed asset register: CSV or Excel</b><span class="small">${s?esc(s.file)+' · '+s.items.length+' assets · cost '+inrc(s.items.reduce((t,x)=>t+x.v,0)):'Asset tag / code, description, location, date put to use, cost (and WDV).'}</span><input type="file" data-file="far" accept=".csv,.xlsx,.xls" hidden></label>`;
+  const s=d.fav;let h=`<label class="drop" data-drop="far" style="margin-bottom:12px">${ic('up')}<b>Fixed asset register: PDF, Excel or CSV</b><span class="small">${s?esc(s.file)+' · '+s.items.length+' assets · cost '+inrc(s.items.reduce((t,x)=>t+x.v,0)):'Asset tag / code, description, location, date put to use, cost (and WDV).'}</span><input type="file" data-file="far" accept=".pdf,.csv,.xlsx,.xls" hidden></label>`;
   if(!s)return h+concBox(d,'fav');
   h+=sampleBar('fav',s,'Verify every asset costing at least');if(!s.sample?.length)return h+concBox(d,'fav');
   const S1=s.items.filter(x=>s.sample.includes(x.id)),res=s.res||{},done=S1.filter(x=>res[x.id]?.r),cnt=k=>done.filter(x=>res[x.id].r===k);
