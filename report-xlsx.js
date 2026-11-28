@@ -96,6 +96,11 @@ function docsUsed(audits,cl,procs){const D=[];let n=0;const add=(o)=>D.push({id:
    Rules, as large firms keep them: no merged cells in a table (only narrative paragraphs are merged across the page width);
    navy table headers, white bold, with a filter; banded rows; amounts right-aligned in Indian format; text left; dates are dates;
    colour only for status and priority; the same grid on every report sheet: A margin · B to H content; print: landscape, fit to width. */
+/* how many lines a text takes in a column of width w (Excel character units, Calibri 10): words wrap whole, with a small margin
+   for the cell's inner padding; bold text is wider */
+function xLines(t,w,bold,k=1){const cap=Math.max(4,Math.floor((w-1.6)*(bold?1.0:1.12)*(k===1?1:1.25)));let n=0;
+  for(const para of String(t??'').split('\n')){let L=0,cur=0;for(const wd of para.split(/\s+/).filter(Boolean)){const l=wd.length;if(!cur){cur=l;L=1;while(cur>cap){cur-=cap;L++}}else if(cur+1+l<=cap)cur+=1+l;else{L++;cur=l;while(cur>cap){cur-=cap;L++}}}n+=Math.max(1,L)}
+  return Math.max(1,n)}
 const GRID=[2,11,36,18,44,18,36,16];   // A margin · B priority/# · C name · D result or amount · E text · F short · G text · H short
 const PRI={H:['High','badC'],M:['Medium','warnC'],L:['Low','okC']};
 function RS(name,w){this.name=name;this.w=w||GRID;this.n=this.w.length;this.rows=[];this.merges=[];this.heights={};this.tab='FF1F2A5C';this.freeze=null;this.filter=null}
@@ -104,32 +109,43 @@ RS.prototype={
   push(cells,h){this.rows.push(cells);if(h)this.heights[this.rows.length]=h;return this.rows.length},
   gap(h){this.push([],h||10)},
   fill(v,s,h,from=1){const c=[];c[from]={v,s};for(let j=from+1;j<this.n;j++)c[j]={v:'',s};return this.push(c,h)},
-  title(t,sub,back){this.gap(8);this.fill(t,'title',32);const r=this.fill(sub||'','sub',20);if(back)this.rows[r-1][this.n-1]={v:'‹ Summary',s:'link',f:`HYPERLINK("#'${back}'!A1","‹ Summary")`};this.gap(6)},
+  title(t,sub,back){this.gap(8);this.fill(t,'title',32);const r=this.fill(sub||'','sub',20),endC=back?this.n-2:this.n-1;
+    if(endC>1){this.merges.push('B'+r+':'+this.col(endC)+r);const wd=this.w.slice(1,endC+1).reduce((a,b)=>a+b,0);this.heights[r]=Math.max(20,xLines(sub||'',wd,false)*14+6);this.rows[r-1][1].s='subW'}
+    if(back)this.rows[r-1][this.n-1]={v:'‹ Summary',s:'linkR',f:`HYPERLINK("#'${back}'!A1","‹ Summary")`};this.gap(6)},
   section(t){this.gap(12);this.fill(t,'sect',24)},
   para(t,s){const r=this.push([,{v:t,s:s||'plain'},...Array.from({length:this.n-2},()=>({v:'',s:s||'plain'}))]);this.merges.push('B'+r+':'+this.col(this.n-1)+r);
-    const width=this.w.slice(1).reduce((a,b)=>a+b,0);this.heights[r]=Math.max(18,Math.ceil(String(t).length/(width*1.1))*15+6);return r},
+    const width=this.w.slice(1).reduce((a,b)=>a+b,0);this.heights[r]=Math.max(18,xLines(t,width,false,s==='note'?0.9:1)*15+6);return r},
   /* a table: cols = [{h, at:'B'..'H', k:'t'|'n'|'n2'|'d'|'c'|'b'}]; rows = arrays of values (or {v,s}) in the order of cols */
-  table(cols,rows,o={}){const idx=c=>c.at.charCodeAt(0)-65,hr=[];for(const c of cols)hr[idx(c)]={v:c.h,s:'thead'};const h0=this.push(hr,30);
+  /* a table: cols = [{h, at:'B'..'H', k:'t'|'n'|'n2'|'d'|'c'|'b'}]; rows = arrays of values (or {v,s}) in the order of cols.
+     Without a filter the table is stretched to the page grid (B to the last column), like the title bar above it: the first column
+     takes the empty columns on its left and the last column the empty ones on its right (merged per row). */
+  table(cols,rows,o={}){const idx=c=>c.at.charCodeAt(0)-65,hr=[],ix=cols.map(idx),last=this.n-1;
+    const span=ix.map((j,q)=>[j,j]);if(o.fit!==false&&cols.length){const lo=Math.min(...ix),hi=Math.max(...ix);
+      if(lo>1){const q=ix.indexOf(lo);span[q][0]=1}if(hi<last){const q=ix.indexOf(hi);span[q][1]=last}}
+    const wid=q=>{let t=0;for(let j=span[q][0];j<=span[q][1];j++)t+=this.w[j]||8;return t};
+    const put=(cells,q,cell)=>{const [a,b]=span[q];cells[a]=cell;for(let j=a+1;j<=b;j++)cells[j]={v:'',s:cell.s}};
+    const mergeRow=r=>span.forEach(([a,b])=>{if(b>a)this.merges.push(this.col(a)+r+':'+this.col(b)+r)});
+    cols.forEach((c,q)=>put(hr,q,{v:c.h,s:'thead'}));const h0=this.push(hr,Math.max(26,...cols.map((c,q)=>xLines(c.h,wid(q),true)*13+8)));mergeRow(h0);
     rows.forEach((row,ri)=>{const z=ri%2===1,cells=[];let lines=1;
       cols.forEach((c,j)=>{let v=row[j],s=null;if(v&&typeof v==='object'&&!Array.isArray(v)){s=v.s;v=v.v}
         if(s==null){const k=c.k||(typeof v==='number'?'n':'t');s=k==='n'?'n0':k==='n2'?'n2':k==='d'?'dt':k==='c'?'tdC':k==='b'?'tdB':'td';if(z&&!/^(n0B)$/.test(s))s=s+'Z'}
         const cell={v:v??'',s};if((c.k==='d'||s.startsWith('dt'))&&/^\d{4}-\d{2}-\d{2}$/.test(String(v))){cell.v=String(v).slice(8,10)+'-'+String(v).slice(5,7)+'-'+String(v).slice(0,4);cell.date=true}
-        if(row[j]&&typeof row[j]==='object'&&row[j].f)cell.f=row[j].f;cells[idx(c)]=cell;
-        if(typeof v==='string')lines=Math.max(lines,Math.ceil(v.length/Math.max(6,this.w[idx(c)]*1.05)))});
-      this.push(cells,Math.min(140,Math.max(18,lines*14+4)))});
-    if(o.filter&&rows.length){const a=cols.map(idx),r1=h0,r2=h0+rows.length;this.filter=this.col(Math.min(...a))+r1+':'+this.col(Math.max(...a))+r2}
+        if(row[j]&&typeof row[j]==='object'&&row[j].f)cell.f=row[j].f;put(cells,j,cell);
+        if(typeof v==='string')lines=Math.max(lines,xLines(v,wid(j),/B|^tdB|^cellB|^lbl/.test(s)))});
+      const r=this.push(cells,Math.min(160,Math.max(20,lines*13+7)));mergeRow(r)});
+    if(o.filter&&rows.length){const r1=h0,r2=h0+rows.length;this.filter=this.col(Math.min(...ix))+r1+':'+this.col(Math.max(...ix))+r2}
     if(o.freeze)this.freeze={row:h0};return h0},
   /* label and value pairs (key figures, engagement details): no merge needed, value in its own column */
   pairs(L,cols){const at=cols||{l:'C',v:'D',x:'E'};this.table([{h:'Item',at:at.l,k:'b'},{h:'Value',at:at.x?at.x:at.v,k:'n'},...(at.x?[{h:'What it means',at:at.v}]:[])],L.map(p=>at.x?[p[0],p[1],p[2]||'']:[p[0],p[1]]))},
   out(){const o={name:this.name,rows:this.rows,w:this.w,merges:this.merges,heights:this.heights,tab:this.tab,freeze:this.freeze,filter:this.filter,foot:XS_FOOT};
     /* the client's logo at the right end of the navy title bar (row 2), the same finished tile as in the app */
     if(XS_LOGO&&this.rows[1]?.[1]?.s==='title'){const L=XS_LOGO,h=34,w=Math.round(h*L.w/L.h),tot=this.w.reduce((t,x)=>t+Math.trunc(x*7+5),0),y0=(this.heights[1]||16)*4/3,bar=(this.heights[2]||32)*4/3;
-      o.images=[{png:L.png,w,h,x:Math.max(0,tot-w-10),y:y0+(bar-h)/2,alt:'Client logo'}]}
+      o.images=[{png:L.png,w,h,x:Math.max(0,tot-w-24),y:y0+(bar-h)/2,alt:'Client logo'}]}
     return o}};
 let XS_FOOT='',XS_LOGO=null;
 const _logoOf=c=>typeof clogoPng==='function'?clogoPng(c):null;
 const chip=(t,s)=>({v:t,s});
-const linkTo=(sheet,text)=>({v:text,s:'link',f:`HYPERLINK("#'${sheet}'!A1","${String(text).replace(/"/g,'')}")`});
+const linkTo=(sheet,text)=>({v:text,s:'linkB',f:`HYPERLINK("#'${sheet}'!A1","${String(text).replace(/"/g,'')}")`});
 const opinionAll=(O,procs)=>['Satisfactory','Needs improvement','Unsatisfactory'][Math.max(['Satisfactory','Needs improvement','Unsatisfactory'].indexOf(opinionOf(O)),procs.some(p=>p.tone==='bad')?2:procs.some(p=>p.tone==='warn')?1:0)];
 const opStyle=op=>op==='Satisfactory'?'okC':op==='Needs improvement'?'warnC':'badC';
 
@@ -252,17 +268,57 @@ function evSheetX(audits,cl,SUM){const x=new RS('Evidence annex',[2,30,40,30,40,
   for(const c of cl)for(const e of S.evidence.filter(z=>z.clientId===c.id&&!z.auditId))L.push(['(client file) '+c.name,e.name,e.purpose||'','',e.type||'',Math.round((e.size||0)/1024),e.uploadedBy||'',(e.uploadedAt||'').slice(0,10),e.sha256||'']);
   x.table([{h:'Audit',at:'B'},{h:'File',at:'C',k:'b'},{h:'Purpose',at:'D'},{h:'Checklist step',at:'E'},{h:'Type',at:'F',k:'c'},{h:'Size (KB)',at:'G',k:'n'},{h:'Uploaded by',at:'H'},{h:'Uploaded on',at:'I',k:'d'},{h:'SHA-256',at:'J'}],L,{filter:true,freeze:true});
   if(!L.length)x.para('No files on record.','note');return x.out()}
-function coverSheet(audits,cl,sheets,procs,op){const x=new RS('Cover',[2,4,28,96,4]);x.tab='FF102347';
-  const navy=(v,s,h)=>x.push([,{v:'',s:'cover'},{v,s},{v:'',s},{v:'',s:'cover'}],h);
-  navy('','cover',30);navy('Internal Audit Report','cover',48);navy(cl.map(c=>c.name).join(', '),'coverS',26);navy([...new Set(audits.map(a=>a.period).filter(Boolean))].join(', '),'coverS',22);navy('','cover',30);
-  x.gap(16);
-  x.table([{h:'Engagement',at:'C',k:'b'},{h:'Details',at:'D'}],[['Client',cl.map(c=>c.name+(c.gstin?'   ·   GSTIN '+c.gstin:'')).join('; ')],['Audits covered',audits.map(a=>a.title).join('; ')],['Period',[...new Set(audits.map(a=>a.period).filter(Boolean))].join(', ')],['Prepared by',session?.user?.email||''],['Date of report',fmtD(today())],['Overall opinion',chip(op,opStyle(op))],['Basis','Standards on Internal Audit (SIA) issued by ICAI; report in the SIA 370 structure. Figures are from the client\'s books and the government portals listed in "Documents used".']]);
-  x.section('Contents');
-  const desc=n=>n==='1 Summary'?'The opinion, every procedure at a glance, and what to fix first':n==='2 How to read'?'Colours, the layout, and the words used, for readers new to audit':n==='Findings'?'Every finding, numbered, with the money involved and what to do':n==='Observations'?'Observations reported to management, with their responses':n==='For discussion'?'Points to agree with management (yellow cells to fill)':n==='Documents used'?'Every document and data source the audit relied on':n==='Evidence annex'?'The files on record, with their integrity hash':'Procedure: '+(procs.find(p=>p.sheet===n)?.f.plain||'');
-  x.table([{h:'Sheet',at:'C',k:'b'},{h:'What it contains',at:'D'}],sheets.filter(s=>!/^\d+\.\d+ /.test(s.name)).map(s=>[linkTo(s.name,s.name),desc(s.name)]));
-  x.section('Sign-off');x.table([{h:'',at:'C',k:'b'},{h:'Name, signature and date',at:'D'}],[['Prepared by',{v:'',s:'in'}],['Reviewed by',{v:'',s:'in'}],['Approved by',{v:'',s:'in'}]]);
-  const o=x.out(),px=v=>Math.trunc(v*7+5),band=[30,48,26,22,30].reduce((t,v)=>t+v,0)*4/3,right=px(2)+px(4)+px(28)+px(96);
-  /* the client's logo (or each client's, side by side) on the right of the navy band */
-  const Ls=cl.map(_logoOf).filter(Boolean).slice(0,3);let xr=right-18;o.images=[];
-  for(const L of Ls.reverse()){const h=Math.round(Math.min(Ls.length>1?84:116,(Ls.length>1?200:300)*L.h/L.w)),w=Math.round(h*L.w/L.h);xr-=w;o.images.push({png:L.png,w,h,x:xr,y:(band-h)/2,alt:'Client logo'});xr-=14}
-  return o}
+/* the cover: a full navy letterhead (client, audits, period, logo, key client facts), four result tiles, the client and engagement
+   details side by side, the contents with each procedure's result, and the sign-off. Its own grid: A margin, then eight equal columns. */
+function coverSheet(audits,cl,sheets,procs,op){const W=[2,19,19,19,19,19,19,19,19],x=new RS('Cover',W);x.tab='FF102347';x.cover=true;
+  const N=8,PX=v=>Math.trunc(v*7+5),total=W.reduce((t,v)=>t+PX(v),0);
+  /* one row: blocks [first column 1..8, span, value, style]; columns not covered get the row's base style */
+  const line=(blocks,h,base)=>{const c=[];if(base)for(let j=1;j<=N;j++)c[j]={v:'',s:base};
+    for(const [j,sp,v,st,f] of blocks){c[j]={v:v??'',s:st};if(f)c[j].f=f;for(let k=j+1;k<j+sp;k++)c[k]={v:'',s:st}}
+    const r=x.push(c,h);for(const [j,sp] of blocks)if(sp>1)x.merges.push(x.col(j)+r+':'+x.col(j+sp-1)+r);return r};
+  const c0=cl[0]||{},many=cl.length>1,per=[...new Set(audits.map(a=>a.period).filter(Boolean))].join(', ')||'Period not set';
+  const names=cl.map(c=>c.name).join(' · ');
+  /* letterhead */
+  const hs=[16,16,46,22,18,14,17,24,16];
+  line([],hs[0],'cover');
+  line([[1,5,'INTERNAL AUDIT REPORT','coverK']],hs[1],'cover');
+  line([[1,5,names,names.length>34?'coverM':'cover']],hs[2],'cover');
+  line([[1,5,audits.map(a=>a.title).join(' · '),'coverT']],hs[3],'cover');
+  line([[1,5,'Period: '+per+'     ·     Report dated '+fmtD(today()),'coverS']],hs[4],'cover');
+  line([],hs[5],'cover');
+  const facts=many?[['CLIENTS',String(cl.length)],['AUDITS',String(audits.length)],['PERIOD',per],['REPORT DATE',fmtD(today())]]
+    :[['ENTITY',ENT[c0.type]||'—'],['GSTIN',c0.gstin||'—'],['INDUSTRY',c0.industry||BIZ[c0.biz]||'—'],['BOOKS KEPT IN',c0.system||'—']];
+  line(facts.map(([k],i)=>[1+i*2,2,k,'coverK']),hs[6],'cover');
+  line(facts.map(([,v],i)=>[1+i*2,2,v,'coverB']),hs[7],'cover');
+  line([],hs[8],'cover');line([],4,'accent');
+  /* the logo(s) on the right of the letterhead, centred on the client name block */
+  const pt2px=v=>v*4/3,yTop=pt2px(hs[0]),yBot=pt2px(hs[0]+hs[1]+hs[2]+hs[3]+hs[4]);
+  const Ls=cl.map(_logoOf).filter(Boolean).slice(0,3);x.images=[];let xr=total-40;
+  for(const L of Ls.slice().reverse()){const h=Math.round(Math.min(Ls.length>1?80:(yBot-yTop-8),(Ls.length>1?180:300)*L.h/L.w)),w=Math.round(h*L.w/L.h);xr-=w;x.images.push({png:L.png,w,h,x:xr,y:yTop+(yBot-yTop-h)/2,alt:'Client logo'});xr-=14}
+  /* result tiles */
+  const O=obsOfReport(audits),hi=procs.reduce((t,p)=>t+p.f.problems.filter(q=>q.r==='H').length,0)+O.filter(o=>o.rating==='H'&&o.status!=='Closed').length;
+  const money=procs.reduce((t,p)=>t+(+p.f.money||0),0),done=procs.filter(p=>p.tone!=='none').length;
+  x.gap(14);
+  line([[1,2,op,op==='Satisfactory'?'tileG':op==='Needs improvement'?'tileA':'tileR'],[3,2,done+' of '+procs.length,done===procs.length?'tileG':'tileV'],[5,2,String(hi),hi?'tileR':'tileG'],[7,2,Math.round(money),money?'tileN':'tileV']],44);
+  line([[1,2,'Overall opinion','tileL'],[3,2,'Procedures completed','tileL'],[5,2,'High-priority problems to fix first','tileL'],[7,2,'Money involved (₹)','tileL']],26);
+  /* client and engagement, side by side */
+  x.gap(10);x.fill('Client and engagement','sect',24);x.gap(6);
+  const L=[['Client',many?names:c0.name],['Entity type',many?'—':[ENT[c0.type],typeof isSmall==='function'&&isSmall(c0)?'small company':''].filter(Boolean).join(', ')],['GSTIN',many?cl.map(c=>c.gstin||'—').join(', '):c0.gstin||'—'],['Industry',many?'—':c0.industry||'—'],['Nature of business',many?'—':BIZ[c0.biz]||'—'],['Turnover, last year',many?'—':c0.turnover?'₹'+c0.turnover+' crore':'—'],['Books kept in',many?'—':c0.system||'—'],...(!many&&c0.pan?[['PAN',c0.pan]]:[]),...(!many&&c0.address?[['Address',c0.address]]:[])];
+  const R=[['Audits covered',audits.map(a=>a.title).join('; ')],['Period',per],['Stage',[...new Set(audits.map(a=>a.stage).filter(Boolean))].join(', ')||'—'],['Report date',fmtD(today())],['Prepared by',session?.user?.email||''],['Distribution','Audit Committee, Managing Director, process owners'],['Observations raised',O.length+' ('+['H','M','L'].map(k=>O.filter(o=>o.rating===k).length+' '+{H:'high',M:'medium',L:'low'}[k]).join(', ')+')']];
+  while(R.length<L.length)R.push(['','']);while(L.length<R.length)L.push(['','']);
+  line([[1,4,'The client','thead'],[5,4,'The engagement','thead']],24);
+  for(let i=0;i<L.length;i++){const z=i%2?'Z':'',lt=xLines(L[i][1],38,false),rt=xLines(R[i][1],38,false);
+    line([[1,2,L[i][0],'lblP'],[3,2,L[i][1],'cell'+z],[5,2,R[i][0],'lblP'],[7,2,R[i][1]||'',R[i][1]||!R[i][0]?'cell'+z:'in']],Math.max(20,Math.max(lt,rt)*13+7))}
+  x.gap(6);const bas='Basis: Standards on Internal Audit (SIA) issued by ICAI; the report follows the SIA 370 structure. Figures are taken from the client\'s books and the government portals listed in the sheet "Documents used".';
+  const rb=line([[1,8,bas,'note']],xLines(bas,150,false)*14+6);
+  /* contents: on a page of its own when printed */
+  x.breaks=[x.rows.length];x.gap(10);x.fill('Contents','sect',24);x.gap(6);
+  const desc=n=>n==='1 Summary'?'The opinion, every procedure at a glance, and what to fix first':n==='2 How to read'?'Colours, the layout, and the words used, for readers new to audit':n==='Findings'?'Every finding, numbered, with the money involved and what to do':n==='Observations'?'Observations reported to management, with their responses':n==='For discussion'?'Points to agree with management (yellow cells to fill)':n==='Documents used'?'Every document and data source the audit relied on':n==='Evidence annex'?'The files on record, with their integrity hash':(procs.find(p=>p.sheet===n)?.f.plain||'Procedure');
+  line([[1,2,'Sheet','thead'],[3,5,'What it contains','thead'],[8,1,'Result','thead']],24);
+  sheets.filter(s=>!/^\d+\.\d+ /.test(s.name)).forEach((s,i)=>{const p=procs.find(q=>q.sheet===s.name),z=i%2?'Z':'',d=desc(s.name);
+    line([[1,2,s.name,'linkB'+z,`HYPERLINK("#'${s.name}'!A1","${s.name.replace(/"/g,'')}")`],[3,5,d,'cell'+z],[8,1,p?TONE[p.tone][1]:'',p?{ok:'okC',warn:'warnC',bad:'badC',none:'noneC'}[p.tone]:'tdC'+z]],Math.max(20,xLines(d,95,false)*13+7))});
+  /* sign-off */
+  x.gap(10);x.fill('Sign-off','sect',24);x.gap(6);
+  line([[1,2,'','thead'],[3,2,'Name','thead'],[5,2,'Signature','thead'],[7,2,'Date','thead']],24);
+  for(const k of ['Prepared by','Reviewed by','Approved by'])line([[1,2,k,'lblP'],[3,2,'','in'],[5,2,'','in'],[7,2,'','in']],30);
+  const o=x.out();o.images=x.images;o.breaks=x.breaks;return o}
